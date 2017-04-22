@@ -113,7 +113,8 @@ namespace CLEO
 
 	inline SCRIPT_VAR * GetScriptParamPointer(CRunningScript *thread) 
 	{
-		return GetScriptParamPointer2(thread, 0);
+		SCRIPT_VAR* ptr = GetScriptParamPointer2(thread, 0);
+		return ptr;
 	}
 	
 	extern "C" {

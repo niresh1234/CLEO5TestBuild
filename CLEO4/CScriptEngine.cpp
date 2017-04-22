@@ -118,7 +118,7 @@ namespace CLEO
 			call FUNC_GetScriptParamPointer1
 			mov result, eax
 		}
-		return result;
+		return (SCRIPT_VAR*)((size_t)result + pScript->GetBasePointer());
 	}
 
 	void __fastcall _GetScriptStringParam(CRunningScript *pScript, int dummy, char *buf, int len)
@@ -602,24 +602,24 @@ namespace CLEO
 		FUNC_RemoveScriptFromQueue		= gvm.TranslateMemoryAddress(MA_REMOVE_SCRIPT_FROM_QUEUE_FUNCTION);
 		FUNC_StopScript					= gvm.TranslateMemoryAddress(MA_STOP_SCRIPT_FUNCTION);
 		FUNC_ScriptOpcodeHandler00		= gvm.TranslateMemoryAddress(MA_SCRIPT_OPCODE_HANDLER0_FUNCTION);
-		FUNC_GetScriptParams				= gvm.TranslateMemoryAddress(MA_GET_SCRIPT_PARAMS_FUNCTION);
+		FUNC_GetScriptParams			= gvm.TranslateMemoryAddress(MA_GET_SCRIPT_PARAMS_FUNCTION);
 		FUNC_TransmitScriptParams		= gvm.TranslateMemoryAddress(MA_TRANSMIT_SCRIPT_PARAMS_FUNCTION);
-		FUNC_SetScriptParams				= gvm.TranslateMemoryAddress(MA_SET_SCRIPT_PARAMS_FUNCTION);
-		FUNC_SetScriptCondResult			= gvm.TranslateMemoryAddress(MA_SET_SCRIPT_COND_RESULT_FUNCTION);
+		FUNC_SetScriptParams			= gvm.TranslateMemoryAddress(MA_SET_SCRIPT_PARAMS_FUNCTION);
+		FUNC_SetScriptCondResult		= gvm.TranslateMemoryAddress(MA_SET_SCRIPT_COND_RESULT_FUNCTION);
 		FUNC_GetScriptParamPointer1		= gvm.TranslateMemoryAddress(MA_GET_SCRIPT_PARAM_POINTER1_FUNCTION);
 		FUNC_GetScriptStringParam		= gvm.TranslateMemoryAddress(MA_GET_SCRIPT_STRING_PARAM_FUNCTION);
 		FUNC_GetScriptParamPointer2		= gvm.TranslateMemoryAddress(MA_GET_SCRIPT_PARAM_POINTER2_FUNCTION);
 
-		AddScriptToQueue				= reinterpret_cast<void (__thiscall*)(CRunningScript*,CRunningScript**)>(_AddScriptToQueue);
+		AddScriptToQueue			= reinterpret_cast<void (__thiscall*)(CRunningScript*,CRunningScript**)>(_AddScriptToQueue);
 		RemoveScriptFromQueue		= reinterpret_cast<void (__thiscall*)(CRunningScript*,CRunningScript**)>(_RemoveScriptFromQueue);
 		StopScript					= reinterpret_cast<void (__thiscall*)(CRunningScript*)>(_StopScript);
 		ScriptOpcodeHandler00		= reinterpret_cast<char (__thiscall*)(CRunningScript*,WORD)>(_ScriptOpcodeHandler00);
 		GetScriptParams				= reinterpret_cast<void (__thiscall*)(CRunningScript*,int)>(_GetScriptParams);
-		TransmitScriptParams			= reinterpret_cast<void (__thiscall*)(CRunningScript*,CRunningScript*)>(_TransmitScriptParams);
+		TransmitScriptParams		= reinterpret_cast<void (__thiscall*)(CRunningScript*,CRunningScript*)>(_TransmitScriptParams);
 		SetScriptParams				= reinterpret_cast<void (__thiscall*)(CRunningScript*,int)>(_SetScriptParams);
 		SetScriptCondResult			= reinterpret_cast<void (__thiscall*)(CRunningScript*,bool)>(_SetScriptCondResult);
 		GetScriptParamPointer1		= reinterpret_cast<SCRIPT_VAR * (__thiscall*)(CRunningScript*)>(_GetScriptParamPointer1);
-		GetScriptStringParam			= reinterpret_cast<void (__thiscall*)(CRunningScript*,char*,BYTE)>(_GetScriptStringParam);
+		GetScriptStringParam		= reinterpret_cast<void (__thiscall*)(CRunningScript*,char*,BYTE)>(_GetScriptStringParam);
 		GetScriptParamPointer2		= reinterpret_cast<SCRIPT_VAR * (__thiscall*)(CRunningScript*,int)>(_GetScriptParamPointer2);
 
 		InitScm			= gvm.TranslateMemoryAddress(MA_INIT_SCM_FUNCTION);
@@ -627,11 +627,11 @@ namespace CLEO
 		LoadScmData		= gvm.TranslateMemoryAddress(MA_LOAD_SCM_DATA_FUNCTION);
 
 		GameTimer		= gvm.TranslateMemoryAddress(MA_GAME_TIMER);
-		opcodeParams		= gvm.TranslateMemoryAddress(MA_OPCODE_PARAMS);
+		opcodeParams	= gvm.TranslateMemoryAddress(MA_OPCODE_PARAMS);
 		missionLocals	= gvm.TranslateMemoryAddress(MA_MISSION_LOCALS);
-		scmBlock			= gvm.TranslateMemoryAddress(MA_SCM_BLOCK);
+		scmBlock		= gvm.TranslateMemoryAddress(MA_SCM_BLOCK);
 		MissionLoaded	= gvm.TranslateMemoryAddress(MA_MISSION_LOADED);
-		missionBlock		= gvm.TranslateMemoryAddress(MA_MISSION_BLOCK);
+		missionBlock	= gvm.TranslateMemoryAddress(MA_MISSION_BLOCK);
 		onMissionFlag	= gvm.TranslateMemoryAddress(MA_ON_MISSION_FLAG);
 
 		// Protect script dependencies
@@ -811,6 +811,8 @@ namespace CLEO
 			sprintf(safe_name, "./cleo/cleo_saves/cs%d.sav", nSlot);
 			TRACE("Saving script engine state to the file %s", safe_name);
 			
+			CreateDirectory("cleo", NULL);
+			CreateDirectory("cleo/cleo_saves", NULL);
 			std::ofstream ss(safe_name, std::ios::binary);
 			if(ss.is_open())
 			{

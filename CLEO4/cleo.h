@@ -36,6 +36,9 @@ namespace CLEO
 
 		void Start()
 		{
+			CreateDirectory("cleo", NULL);
+			CreateDirectory("cleo/cleo_saves", NULL);
+			CreateDirectory("cleo/cleo_text", NULL);
 			CodeInjector.OpenReadWriteAccess();		// must do this earlier to ensure plugins write access on init
 			GameMenu.Inject(CodeInjector);
 			DmaFix.Inject(CodeInjector);
