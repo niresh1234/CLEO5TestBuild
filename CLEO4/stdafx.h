@@ -29,7 +29,7 @@ enum CLEO_Version
 	
 	CLEO_VERSION				= CLEO_VER_4,
 };
-#define VERSION_LONG		0x04030000
+#define VERSION_LONG		0x04031300
 #define VERSION_STRING	"4.3"
 
 #define OP_NOP			0x90
