@@ -811,13 +811,15 @@ namespace CLEO
 		prevScmFunctionId(reinterpret_cast<CCustomScript*>(thread)->GetScmFunction()), retnAddress(thread->GetBytePointer())
 		{
 			auto cs = reinterpret_cast<CCustomScript*>(thread);
-            auto locals = cs->IsMission()? missionLocals : cs->LocalVar;
-			std::copy(locals, locals + 32, savedTls);
+
+			auto scope = cs->IsMission() ? missionLocals : cs->LocalVar;
+			std::copy(scope, scope + 32, savedTls);
+
 			SCRIPT_VAR fill_val; fill_val.dwParam = 0;
 
 			// CLEO 3 didnt initialise local storage, so dont do it if we're processing a CLEO 3 script in case the storage is used
 			if(cs->IsCustom() && cs->GetCompatibility() >= CLEO_VER_4_MIN)
-				std::fill(locals, locals + 32, fill_val);	// fill with zeros
+				std::fill(scope, scope + 32, fill_val);	// fill with zeros
 
 			cs->SetScmFunction(thisScmFunctionId = allocationPlace);
 		}
@@ -825,7 +827,7 @@ namespace CLEO
 		void Return(CRunningScript *thread)
 		{
 			auto cs = reinterpret_cast<CCustomScript*>(thread);
-			std::copy(savedTls, savedTls + 32, cs->IsMission()? missionLocals : cs->LocalVar);
+			std::copy(savedTls, savedTls + 32, cs->IsMission() ? missionLocals : cs->LocalVar);
 			cs->SetIp(retnAddress);
 			cs->SetScmFunction(prevScmFunctionId);
 		}
@@ -1549,20 +1551,20 @@ loop_end_0AA8:
 		DWORD key;
 		*thread >> key;
 		SHORT state = GetKeyState(key);
-		SetScriptCondResult(thread, GetKeyState(key) & 0x8000);
+		SetScriptCondResult(thread, (GetKeyState(key) & 0x8000) != 0);
 		return OR_CONTINUE;
 	}
 	
 	//0AB1=-1,call_scm_func %1p%
 	OpcodeResult __stdcall opcode_0AB1(CRunningScript *thread)
 	{
-		DWORD	label,
-				nParams;
+		int		label;
+		DWORD	nParams;
 
 		*thread >> label >> nParams;
 
 		static SCRIPT_VAR arguments[64];
-		SCRIPT_VAR	* arguments_end	= arguments + nParams;
+		SCRIPT_VAR* arguments_end = &arguments[nParams];
 
 		if(nParams)
 		{
@@ -1598,7 +1600,8 @@ loop_end_0AA8:
 		new ScmFunction(thread);
 
 		// pass arguments
-		if(nParams) std::copy(arguments, arguments_end, thread->IsMission() ? missionLocals : thread->GetVarPtr());
+		if(nParams)
+			std::copy(arguments, arguments_end, thread->IsMission() ? missionLocals : thread->GetVarPtr());
 
 		// jump to label
 		ThreadJump(thread, label);
@@ -1699,8 +1702,8 @@ loop_end_0AA8:
 	{
 		DWORD hVehicle;
 		*thread >> hVehicle;
-		auto id = reinterpret_cast<CVehicleModelInfo*>(Models[GetVehiclePool().AtHandle(hVehicle)->m_wModelIndex - 400])->m_wHandlingIndex;
-		*thread << Handling->m_aVehicleHandling[id].m_transmissionData.m_nNumberOfGears;
+		auto id = reinterpret_cast<CVehicleModelInfo*>(Models[GetVehiclePool().AtHandle(hVehicle)->m_wModelIndex])->m_wHandlingIndex;
+		*thread << Handling->Automobile[id].m_Transmission.ucNumberOfGears;
 		return OR_CONTINUE;
 	}
 
@@ -2441,7 +2444,9 @@ loop_end_0AA8:
 	//0AE9=0,pop_float
 	OpcodeResult __stdcall opcode_0AE9(CRunningScript *thread)
 	{
-		_asm fstp opcodeParams[0].fParam
+		float result;
+		_asm fstp result
+		opcodeParams[0].fParam = result;
 		SetScriptParams(thread, 1);
 		return OR_CONTINUE;
 	}
@@ -2481,8 +2486,10 @@ loop_end_0AA8:
 		char *format, *result;
 		*thread >> val;
 		format = readString(thread);
-		if (*thread->GetBytePointer() >= 1 && *thread->GetBytePointer() <= 8) *thread >> result;
-		else result = &GetScriptParamPointer(thread)->cParam;
+		if (*thread->GetBytePointer() >= 1 && *thread->GetBytePointer() <= 8)
+			*thread >> result;
+		else
+			result = &GetScriptParamPointer(thread)->cParam;
 		sprintf(result, format, val);
 		return OR_CONTINUE;
 	}

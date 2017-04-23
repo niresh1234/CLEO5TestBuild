@@ -82,7 +82,7 @@ typedef DWORD HPLUGIN;		// Plugin handle
 #define BASS_ERROR_CREATE	33	// couldn't create the file
 #define BASS_ERROR_NOFX		34	// effects are not available
 #define BASS_ERROR_NOTAVAIL	37	// requested data is not available
-#define BASS_ERROR_DECODE	38	// the channel is a "decoding channel"
+#define BASS_ERROR_DECODE	38	// the channel is/isn't a "decoding channel"
 #define BASS_ERROR_DX		39	// a sufficient DirectX version is not installed
 #define BASS_ERROR_TIMEOUT	40	// connection timedout
 #define BASS_ERROR_FILEFORM	41	// unsupported file format
@@ -958,6 +958,33 @@ BOOL BASSDEF(BASS_FXReset)(HFX handle);
 
 #ifdef __cplusplus
 }
+
+#ifdef _WIN32
+static inline HPLUGIN BASS_PluginLoad(const WCHAR *file, DWORD flags)
+{
+	return BASS_PluginLoad((const char*)file, flags|BASS_UNICODE);
+}
+
+static inline HMUSIC BASS_MusicLoad(BOOL mem, const WCHAR *file, QWORD offset, DWORD length, DWORD flags, DWORD freq)
+{
+	return BASS_MusicLoad(mem, (const void*)file, offset, length, flags|BASS_UNICODE, freq);
+}
+
+static inline HSAMPLE BASS_SampleLoad(BOOL mem, const WCHAR *file, QWORD offset, DWORD length, DWORD max, DWORD flags)
+{
+	return BASS_SampleLoad(mem, (const void*)file, offset, length, max, flags|BASS_UNICODE);
+}
+
+static inline HSTREAM BASS_StreamCreateFile(BOOL mem, const WCHAR *file, QWORD offset, QWORD length, DWORD flags)
+{
+	return BASS_StreamCreateFile(mem, (const void*)file, offset, length, flags|BASS_UNICODE);
+}
+
+static inline HSTREAM BASS_StreamCreateURL(const WCHAR *url, DWORD offset, DWORD flags, DOWNLOADPROC *proc, void *user)
+{
+	return BASS_StreamCreateURL((const char*)url, offset, flags|BASS_UNICODE, proc, user);
+}
+#endif
 #endif
 
 #endif

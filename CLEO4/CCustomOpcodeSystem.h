@@ -28,12 +28,12 @@ namespace CLEO
 		friend OpcodeResult __stdcall opcode_0AE6(CRunningScript *pScript);
 		friend OpcodeResult __stdcall opcode_0AE8(CRunningScript *pScript);
 
+	public:
 		std::set<DWORD> m_hFiles;
 		std::set<HMODULE> m_hNativeLibs;
 		std::set<HANDLE> m_hFileSearches;
 		std::set<void *> m_pAllocations;
 
-	public:
 		void FinalizeScriptObjects()
 		{
 			// clean up after opcode_0A99
