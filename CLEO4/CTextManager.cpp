@@ -1,5 +1,4 @@
 #include "stdafx.h"
-#include "StdInc.h"
 
 #include "CTextManager.h"
 #include "cleo.h"
@@ -18,11 +17,12 @@ namespace CLEO
 	void (__cdecl * _PrintBig)(const char *, unsigned time, unsigned style);
 	void (__cdecl * _Print) (const char *, unsigned time, bool flag1, bool flag2);
 	void (__cdecl * _PrintNow) (const char *, unsigned time, bool flag1, bool flag2);
+    const char* (__fastcall * CText__Get)(CText*, int dummy, const char*);
 	DWORD _CText__TKey__locate;
 
 	char message_buf[0x80];
 
-	const char * __fastcall CText__TKey__locate(CText::CKeyArray *key, int dummy, const char *gxt, bool& found)
+	const char * __fastcall CText__TKey__locate(CText__TKey *key, int dummy, const char *gxt, bool& found)
 	{
 		const char * result;
 		_asm
@@ -85,13 +85,13 @@ namespace CLEO
 		szResult = GetInstance().TextManager.LocateFxt(gxt);
 		if(szResult) return szResult;
 
-		szResult = CText__TKey__locate(&text->MainKeys, 0, gxt, bFound);
+		szResult = CText__TKey__locate(&text->tkeyMain, 0, gxt, bFound);
 
 		if(!bFound)
 		{
-			if (text->m_bMissionLoaded || *mpackNumber || text->haveTabl)
+			if (text->missionTableLoaded || *mpackNumber || text->haveTabl)
 			{
-				szResult = CText__TKey__locate(&text->MissionKeys, 0, gxt, bFound);
+				szResult = CText__TKey__locate(&text->tkeyMission, 0, gxt, bFound);
 				if (!bFound)	 return "";
 				//else TRACE("Failed to find used text label '%s'", gxt);
 			}
@@ -126,6 +126,11 @@ namespace CLEO
 		});
 		_chdir(cwd);
 	}
+
+    const char* CTextManager::Get(const char* key)
+    {
+        return CText__Get(gameTexts, 0, key);
+    }
 
 	bool CTextManager::AddFxt(const char *key, const char *value, bool dynamic)
 	{
@@ -214,7 +219,8 @@ namespace CLEO
 		gameTexts				= gvm.TranslateMemoryAddress(MA_GAME_TEXTS);
 		cheatString				= gvm.TranslateMemoryAddress(MA_CHEAT_STRING);
 		mpackNumber				= gvm.TranslateMemoryAddress(MA_MPACK_NUMBER);
-		inj.InjectFunction(CText__locate, gvm.TranslateMemoryAddress(MA_CALL_CTEXT_LOCATE));
+        CText__Get              = gvm.TranslateMemoryAddress(MA_CALL_CTEXT_LOCATE);
+		inj.InjectFunction(CText__locate, CText__Get);
 	}
 
 	CTextManager::FxtEntry::FxtEntry(const char *_text, bool _static) : text(_text), is_static(_static)
