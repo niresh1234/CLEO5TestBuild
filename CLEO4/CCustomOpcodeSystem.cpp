@@ -1703,7 +1703,7 @@ loop_end_0AA8:
 		DWORD hVehicle;
 		*thread >> hVehicle;
 		auto id = reinterpret_cast<CVehicleModelInfo*>(Models[GetVehiclePool().AtHandle(hVehicle)->m_wModelIndex])->m_wHandlingIndex;
-		*thread << Handling->Automobile[id].m_Transmission.ucNumberOfGears;
+		*thread << Handling->m_aVehicleHandling[id].m_transmissionData.m_nNumberOfGears;
 		return OR_CONTINUE;
 	}
 
