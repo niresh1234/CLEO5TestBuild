@@ -3,6 +3,10 @@ cmake_minimum_required(VERSION 3.0)
 
 add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 
+# bass doesn't have SAFESEH
+set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /SAFESEH:NO")
+set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} /SAFESEH:NO")
+
 file(GLOB PLUGIN_SDK_HEADERS "plugin-sdk/plugin_sa/game_sa/*.h")
 
 set(PLUGIN_SDK_SRC 

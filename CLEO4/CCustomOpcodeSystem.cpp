@@ -685,8 +685,8 @@ namespace CLEO
 		}
 	}
 
-	inline bool is_legacy_handle(DWORD dwHandle)				{return (dwHandle & 0x1) == 0;}
-	inline FILE * convert_handle_to_file(DWORD dwHandle)		{return dwHandle ? reinterpret_cast<FILE*>(is_legacy_handle(dwHandle) ? dwHandle : dwHandle & ~(0x1)) : nullptr;}
+	bool is_legacy_handle(DWORD dwHandle)				{return (dwHandle & 0x1) == 0;}
+	FILE * convert_handle_to_file(DWORD dwHandle)		{return dwHandle ? reinterpret_cast<FILE*>(is_legacy_handle(dwHandle) ? dwHandle : dwHandle & ~(0x1)) : nullptr;}
 	
 	inline DWORD open_file(const char * szPath, const char * szMode, bool bLegacy)
 	{
