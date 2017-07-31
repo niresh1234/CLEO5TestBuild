@@ -1733,7 +1733,7 @@ loop_end_0AA8:
 		if (deleted_thread)
 		{
 			GetInstance().ScriptEngine.RemoveCustomScript(deleted_thread);
-			delete deleted_thread;
+			//delete deleted_thread; // Causes Heap Corruption
 		}
 		return deleted_thread == thread ? OR_INTERRUPT : OR_CONTINUE;
 	}	
