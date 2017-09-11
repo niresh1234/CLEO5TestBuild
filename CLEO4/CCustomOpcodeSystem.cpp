@@ -394,6 +394,8 @@ namespace CLEO
 			{
 				size = size > 128 || !size ? 128 : size;
 				strncpy(buf, opcodeParams[0].pcParam, size - 1);
+
+				buf[size - 1] = 0;
 			}
 
 			return opcodeParams[0].pcParam;
