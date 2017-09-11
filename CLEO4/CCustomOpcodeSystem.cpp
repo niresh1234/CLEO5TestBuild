@@ -389,6 +389,13 @@ namespace CLEO
 		{
 			// process parameter as a pointer to string
 			GetScriptParams(thread, 1);
+
+			if (buf != nullptr)
+			{
+				size = size > 128 || !size ? 128 : size;
+				strncpy(buf, opcodeParams[0].pcParam, size - 1);
+			}
+
 			return opcodeParams[0].pcParam;
 		}
 		else
@@ -1733,7 +1740,6 @@ loop_end_0AA8:
 		if (deleted_thread)
 		{
 			GetInstance().ScriptEngine.RemoveCustomScript(deleted_thread);
-			//delete deleted_thread; // Causes Heap Corruption
 		}
 		return deleted_thread == thread ? OR_INTERRUPT : OR_CONTINUE;
 	}	
