@@ -718,12 +718,21 @@ namespace CLEO
 					TRACE("Finished. Loaded %u cleo variables, %u saved threads info, %u stopped threads info", 
 						0x400, safe_header.n_saved_threads, safe_header.n_stopped_threads);
 				}
+				else
+				{
+					memset(CleoVariables, 0, sizeof(CleoVariables));
+				}
 			}
 			catch (std::exception& ex)
 			{
 				TRACE("Loading of cleo safe %s failed: %s", safe_name, ex.what());
 				safe_header.n_saved_threads = safe_header.n_stopped_threads = 0;
+				memset(CleoVariables, 0, sizeof(CleoVariables));
 			}
+		}
+		else
+		{
+			memset(CleoVariables, 0, sizeof(CleoVariables));
 		}
 
 		char cwd[MAX_PATH];
