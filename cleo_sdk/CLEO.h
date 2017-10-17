@@ -6,7 +6,7 @@
 
 #include <wtypes.h>
 
-#define CLEO_VERSION 0x04031600
+#define CLEO_VERSION 0x04031700
 #define CLEO_VERSIONTEXT "4.3"
 
 //result of CLEO_GetGameVersion()
