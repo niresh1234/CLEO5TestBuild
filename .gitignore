@@ -1,9 +1,10 @@
 build/
+output/
 *.APS
 *.VC.db
 *.VC.opendb
 *.asi
-*.dll
+*.cleo
 *.pdb
 *.opensdf
 *.suo
@@ -37,4 +38,3 @@ build/
 Debug/*
 Release/*
 ipch/
-CHANGELOG
