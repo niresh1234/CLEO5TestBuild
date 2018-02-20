@@ -2536,6 +2536,7 @@ extern "C"
     void WINAPI CLEO_SetIntOpcodeParam(CRunningScript* thread, DWORD value);
     void WINAPI CLEO_SetFloatOpcodeParam(CRunningScript* thread, float value);
     LPSTR WINAPI CLEO_ReadStringOpcodeParam(CRunningScript* thread, char *buf, int size);
+	LPSTR WINAPI CLEO_ReadStringPointerOpcodeParam(CRunningScript* thread, char *buf, int size);
     void WINAPI CLEO_WriteStringOpcodeParam(CRunningScript* thread, LPCSTR str);
     void WINAPI CLEO_SetThreadCondResult(CRunningScript* thread, BOOL result);
     void WINAPI CLEO_SkipOpcodeParams(CRunningScript* thread, int count);
@@ -2603,6 +2604,15 @@ extern "C"
         GetScriptStringParam(thread, buf, size);
         return buf;
     }
+
+	LPSTR WINAPI CLEO_ReadStringPointerOpcodeParam(CRunningScript* thread, char *buf, int size)
+	{
+		static char internal_buf[128];
+		if (!buf) { buf = internal_buf; size = 128; }
+		if (!size) size = 128;
+		std::fill(buf, buf + size, '\0');
+		return readString(thread, buf, size);
+	}
 
     void WINAPI CLEO_WriteStringOpcodeParam(CRunningScript* thread, LPCSTR str)
     {

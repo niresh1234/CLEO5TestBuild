@@ -105,6 +105,7 @@ void  WINAPI CLEO_SetIntOpcodeParam(CScriptThread* thread, DWORD value);
 void  WINAPI CLEO_SetFloatOpcodeParam(CScriptThread* thread, float value);
 
 LPSTR WINAPI CLEO_ReadStringOpcodeParam(CScriptThread* thread, LPSTR buf, int size);
+LPSTR WINAPI CLEO_ReadStringPointerOpcodeParam(CScriptThread* thread, LPSTR buf, int size);
 void  WINAPI CLEO_WriteStringOpcodeParam(CScriptThread* thread, LPCSTR str);
 
 void  WINAPI CLEO_SetThreadCondResult(CScriptThread* thread, BOOL result);
