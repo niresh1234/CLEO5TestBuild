@@ -1707,9 +1707,9 @@ namespace CLEO {
 		CGameVersionManager& gvm = GetInstance().VersionManager;
 		DWORD hMarker = gvm.GetGameVersion() != GV_STEAM ? MenuManager->m_nTargetBlipIndex : *((DWORD*)0xC3312C);
 		CMarker *pMarker;
-		if (hMarker && (pMarker = &RadarBlips[LOWORD(hMarker)]) && /*pMarker->m_nPoolIndex == HIWORD(hMarker) && */pMarker->m_nBlipDisplayFlag)
+		if (hMarker && (pMarker = &RadarBlips[LOWORD(hMarker)]) && /*pMarker->m_nPoolIndex == HIWORD(hMarker) && */pMarker->m_nBlipDisplay)
 		{
-			CVector coords(pMarker->m_vPosition);
+			CVector coords(pMarker->m_vecPos);
 			coords.z = FindGroundZ(coords.x, coords.y);
 			*thread << coords;
 			SetScriptCondResult(thread, true);
