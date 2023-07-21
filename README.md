@@ -22,12 +22,12 @@ All plugins are optional, however they may be required by various CLEO scripts.
 ## CLEO Scripts
 
 CLEO allows the installation of 'CLEO scripts', which often use the extension '.cs'. These third-party scripts are entirely user-made and are in no way supported by the developers of this library. While CLEO itself should work in a wide range of game installations, individual scripts are known to have their own compatibility restrictions and can not be guaranteed to work.
-A huge range of CLEO scripts can be found on the web, notably via Grand Theft Auto fansites and modding sites such as:
+CLEO scripts can be found on Grand Theft Auto fansites and modding sites such as:
 
-* http://hotmist.ddo.jp/cleomod/index.html
-* https://www.gtagarage.com/mods/browse.php?C=14
-* https://www.gtainside.com/en/sanandreas/mods-322/
-* https://zazmahall.de/CLEO.htm
+- https://libertycity.net/files/gta-san-andreas/mods/cleo-scripts/
+- https://www.gtainside.com/en/sanandreas/mods-322/
+- http://hotmist.ddo.jp/cleomod/index.html
+- https://zazmahall.de/CLEO.htm
 
 ## Compatibility Mode
 
