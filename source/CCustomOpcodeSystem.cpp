@@ -6,6 +6,8 @@
 #include "CTextManager.h"
 #include "CModelInfo.h"
 
+#include <filesystem>
+
 namespace CLEO {
 	DWORD FUNC_fopen;
 	DWORD FUNC_fclose;
@@ -829,6 +831,7 @@ namespace CLEO {
 	struct ScmFunction
 	{
 		unsigned short prevScmFunctionId, thisScmFunctionId;
+		void* savedBaseIP;
 		BYTE *retnAddress;
 		BYTE* savedStack[8]; // gosub stack
 		WORD savedSP;
@@ -839,7 +842,9 @@ namespace CLEO {
 		bool savedNotFlag;
 		static const size_t store_size = 0x400;
 		static ScmFunction *Store[store_size];
-		static size_t allocationPlace;			// contains an index of last allocated object
+		static size_t allocationPlace; // contains an index of last allocated object
+		std::string savedScriptFileDir; // modules switching
+		std::string savedScriptFileName; // modules switching
 
 		void *operator new(size_t size)
 		{
@@ -866,6 +871,7 @@ namespace CLEO {
 			auto cs = reinterpret_cast<CCustomScript*>(thread);
 
 			// create snapshot of current scope
+			savedBaseIP = cs->BaseIP;
 			std::copy(std::begin(cs->Stack), std::end(cs->Stack), std::begin(savedStack));
 			savedSP = cs->SP;
 
@@ -875,6 +881,9 @@ namespace CLEO {
 			savedCondResult = cs->bCondResult;
 			savedLogicalOp = cs->LogicalOp;
 			savedNotFlag = cs->NotFlag;
+
+			savedScriptFileDir = thread->GetScriptFileDir();
+			savedScriptFileName = thread->GetScriptFileName();
 
 			// init new scope
 			std::fill(std::begin(cs->Stack), std::end(cs->Stack), nullptr);
@@ -891,6 +900,7 @@ namespace CLEO {
 			auto cs = reinterpret_cast<CCustomScript*>(thread);
 
 			// restore parent scope's gosub call stack
+			cs->BaseIP = savedBaseIP;
 			std::copy(std::begin(savedStack), std::end(savedStack), std::begin(cs->Stack));
 			cs->SP = savedSP;
 			
@@ -916,6 +926,9 @@ namespace CLEO {
 				cs->bCondResult = condResult;
 				cs->LogicalOp = savedLogicalOp;
 			}
+
+			thread->SetScriptFileDir(savedScriptFileDir.c_str());
+			thread->SetScriptFileName(savedScriptFileName.c_str());
 
 			cs->SetIp(retnAddress);
 			cs->SetScmFunction(prevScmFunctionId);
@@ -1649,8 +1662,77 @@ namespace CLEO {
 	//0AB1=-1,call_scm_func %1p%
 	OpcodeResult __stdcall opcode_0AB1(CRunningScript *thread)
 	{
-		int		label;
-		*thread >> label;
+		BYTE* base = nullptr;
+		int label = 0;
+
+		char* moduleTxt = nullptr;
+		switch (*thread->GetBytePointer())
+		{
+			// label of current script
+			case DT_DWORD:
+			case DT_WORD:
+			case DT_BYTE:
+			case DT_VAR:
+			case DT_LVAR:
+			case DT_VAR_ARRAY:
+			case DT_LVAR_ARRAY:
+				base = thread->GetBasePointer(); // current script
+				*thread >> label;
+				break;
+
+			// string with module and export name
+			case DT_VAR_STRING:
+			case DT_LVAR_STRING:
+			case DT_VAR_TEXTLABEL:
+			case DT_LVAR_TEXTLABEL:
+				moduleTxt = GetScriptParamPointer(thread)->pcParam;
+				break;
+
+			case DT_STRING:
+			case DT_TEXTLABEL:
+			case DT_VARLEN_STRING:
+				moduleTxt = readString(thread);
+				break;
+
+			default:
+			{
+				std::string err(128, '\0');
+				sprintf(err.data(), "Invalid first argument type (%02X) of 0AB1 opcode in script '%s'", *thread->GetBytePointer(), thread->GetScriptFileName());
+				Error(err.data());
+				return OR_INTERRUPT;
+			}
+		}
+		
+		// parse module reference text
+		if (moduleTxt != nullptr)
+		{
+			std::string str(moduleTxt);
+			auto pos = str.find('@');
+			if (pos == str.npos)
+			{
+				std::string err(128, '\0');
+				sprintf(err.data(), "Invalid module reference '%s' in 0AB1 opcode in script '%s'", str.c_str(), thread->GetScriptFileName());
+				Error(err.data());
+				return OR_INTERRUPT;
+			}
+			str[pos] = '\0'; // split into two texts
+
+			// get module's absolute path
+			std::string modulePath(&str[pos + 1]);
+			modulePath = ResolvePath(modulePath.c_str(), thread->GetScriptFileDir());
+
+			auto scriptRef = GetInstance().ModuleSystem.GetExport(modulePath.c_str(), &str[0]);
+			if (!scriptRef.Valid())
+			{
+				std::string err(128, '\0');
+				sprintf(err.data(), "Not found module '%s' export '%s', requested by 0AB1 opcode in script '%s'", modulePath.c_str(), &str[0], thread->GetScriptFileName());
+				Error(err.data());
+				return OR_INTERRUPT;
+			}
+
+			base = (BYTE*)scriptRef.base;
+			label = scriptRef.offset;
+		}
 
 		DWORD nParams = 0;
 		if(*thread->GetBytePointer()) *thread >> nParams;
@@ -1722,13 +1804,16 @@ namespace CLEO {
 		}
 
 		// jump to label
-		ThreadJump(thread, label);
+		thread->SetBaseIp(base); // script space
+		ThreadJump(thread, label); // script offset
 		return OR_CONTINUE;
 	}
 
 	//0AB2=-1,ret
 	OpcodeResult __stdcall opcode_0AB2(CRunningScript *thread)
 	{
+		GetInstance().ModuleSystem.ReleaseModuleRef((char*)thread->GetBasePointer()); // release module if one used
+
 		ScmFunction *scmFunc = ScmFunction::Store[reinterpret_cast<CCustomScript*>(thread)->GetScmFunction()];
 		
 		DWORD nRetParams = 0;

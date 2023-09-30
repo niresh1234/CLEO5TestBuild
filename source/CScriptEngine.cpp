@@ -1,5 +1,9 @@
 #include "stdafx.h"
 #include "cleo.h"
+#include "CFileMgr.h"
+#include "CGame.h"
+
+#include <filesystem>
 
 namespace CLEO
 {
@@ -180,6 +184,10 @@ namespace CLEO
         GetInstance().TextManager.ClearDynamicFxts();
         GetInstance().OpcodeSystem.FinalizeScriptObjects();
         GetInstance().SoundSystem.UnloadAllStreams();
+
+        GetInstance().ScriptEngine.Initialize();
+        GetInstance().ModuleSystem.Clear();
+        //GetInstance().ModuleSystem.LoadCleoModules(); // TODO: enbale if cleo_modules approved
         GetInstance().ScriptEngine.LoadCustomScripts(false);
     }
 
@@ -280,6 +288,7 @@ namespace CLEO
         gangWeapons[7].weapon1 = 22;
         gangWeapons[7].weapon2 = 28;
         gangWeapons[7].weapon3 = 0;
+
         GetInstance().TextManager.ClearDynamicFxts();
         GetInstance().OpcodeSystem.FinalizeScriptObjects();
         GetInstance().ScriptEngine.RemoveAllCustomScripts();
@@ -662,11 +671,43 @@ namespace CLEO
         inj.InjectFunction(&opcode_004E_hook, gvm.TranslateMemoryAddress(MA_OPCODE_004E));
     }
 
+    CScriptEngine::CScriptEngine()
+    {
+        CustomMission = nullptr;
+    }
+
+    CScriptEngine::~CScriptEngine()
+    {
+        TRACE("Unloading scripts...");
+        RemoveAllCustomScripts();
+    }
+
     CleoSafeHeader safe_header;
     ThreadSavingInfo *safe_info;
     unsigned long *stopped_info;
     std::unique_ptr<ThreadSavingInfo[]> safe_info_utilizer;
     std::unique_ptr<unsigned long[]> stopped_info_utilizer;
+
+    void CScriptEngine::Initialize()
+    {
+        if (CGame::bMissionPackGame == 0) // regular main game
+        {
+            //MainScriptFileDir = "0:\\data\\script"; // at user data TODO: enable when CLEO virtual paths available
+            MainScriptFileDir = CFileMgr::ms_rootDirName;
+            MainScriptFileDir += "data\\script";
+            
+            MainScriptFileName = "main.scm";
+        }
+        else // mission pack
+        {
+            //MainScriptFileDir = "1:\\MPACK\\MPACK"; // at user data TODO: enable when CLEO virtual paths available
+            MainScriptFileDir = CLEO::GetUserDirectory();
+            MainScriptFileDir += "\\MPACK\\MPACK";
+            MainScriptFileDir += std::to_string(CGame::bMissionPackGame);
+
+            MainScriptFileName = "scr.scm";
+        }
+    }
 
     void CScriptEngine::LoadCustomScripts(bool load_mode)
     {
@@ -992,6 +1033,12 @@ namespace CLEO
 
         TRACE("Loading custom script %s...", szFileName);
 
+        // store script file directory and name
+        std::filesystem::path path = szFileName;
+        path = std::filesystem::absolute(path);
+        scriptFileDir = path.parent_path().string();
+        scriptFileName = path.filename().string();
+
         try
         {
 			std::ifstream is;
@@ -999,6 +1046,7 @@ namespace CLEO
 			{
 				if (!parent)
 					throw std::logic_error("Trying to create external thread from label without parent thread");
+
 				BaseIP = parent->GetBasePointer();
 				CurrentIP = parent->GetBasePointer() - label;
 				memcpy(Name, parent->Name, sizeof(Name));

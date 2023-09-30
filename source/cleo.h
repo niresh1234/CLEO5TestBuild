@@ -6,6 +6,7 @@
 #include "CDebug.h"
 #include "CDmaFix.h"
 #include "CGameMenu.h"
+#include "CModuleSystem.h"
 #include "CPluginSystem.h"
 #include "CScriptEngine.h"
 #include "CCustomOpcodeSystem.h"
@@ -21,6 +22,18 @@ namespace CLEO
         bool			m_bStarted;
 
     public:
+        CDmaFix					DmaFix;
+        CGameMenu				GameMenu;
+        CCodeInjector			CodeInjector;
+        CGameVersionManager		VersionManager;
+        CScriptEngine			ScriptEngine;
+        CTextManager			TextManager;
+        CCustomOpcodeSystem		OpcodeSystem;
+        CModuleSystem			ModuleSystem;
+        CSoundSystem			SoundSystem;
+        CPluginSystem			PluginSystem;
+        //CLegacy				Legacy;
+
         CCleoInstance()
         {
             m_bStarted = false;
@@ -37,6 +50,7 @@ namespace CLEO
         void Start()
         {
             CreateDirectory("cleo", NULL);
+            //CreateDirectory("cleo/cleo_modules", NULL); // TODO: enbale if cleo_modules approved
             CreateDirectory("cleo/cleo_saves", NULL);
             CreateDirectory("cleo/cleo_text", NULL);
             CodeInjector.OpenReadWriteAccess();		// must do this earlier to ensure plugins write access on init
@@ -54,20 +68,12 @@ namespace CLEO
         {
             if (!m_bStarted) return;
         }
-
-        CDmaFix					DmaFix;
-        CGameMenu				GameMenu;
-        CCodeInjector			CodeInjector;
-        CGameVersionManager		VersionManager;
-        CScriptEngine			ScriptEngine;
-        CTextManager				TextManager;
-        CCustomOpcodeSystem		OpcodeSystem;
-        CSoundSystem				SoundSystem;
-        CPluginSystem			PluginSystem;
-        //CLegacy					Legacy;
     };
 
     CCleoInstance& GetInstance();
+
+    // get absolute path
+    std::string ResolvePath(const char* path, const char* workDir = nullptr);
 }
 
 #endif

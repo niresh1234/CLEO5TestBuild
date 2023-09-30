@@ -287,4 +287,14 @@ public:
         bIsMission = 0;
         bWastedBustedCheck = 1;
     }
+
+    bool IsCustom(); // is it CLEO Script?
+
+    // absolute path to directory where script's source file is located
+    const char* GetScriptFileDir();
+    void SetScriptFileDir(const char* directory);
+
+    // filename with type extension of script's source file
+    const char* GetScriptFileName();
+    void SetScriptFileName(const char* filename);
 };
