@@ -843,6 +843,7 @@ namespace CLEO {
 		static const size_t store_size = 0x400;
 		static ScmFunction *Store[store_size];
 		static size_t allocationPlace; // contains an index of last allocated object
+		void* moduleExportRef = 0; // modules switching. Points to modules baseIP in case if this is export call
 		std::string savedScriptFileDir; // modules switching
 		std::string savedScriptFileName; // modules switching
 
@@ -1043,12 +1044,10 @@ namespace CLEO {
 	//0A92=-1,create_custom_thread %1d%
 	OpcodeResult __stdcall opcode_0A92(CRunningScript *thread)
 	{
-		const char *script_name = readString(thread);
-		TRACE("[0A92] Starting new custom script %s from thread named %s", script_name, thread->GetName());
-		char cwd[MAX_PATH];
-		_getcwd(cwd, sizeof(cwd));
-		_chdir(cleo_dir);
-		auto cs = new CCustomScript(script_name);
+		auto filename = thread->ResolvePath(readString(thread), DIR_CLEO); // legacy: default search location is game\cleo directory
+		TRACE("[0A92] Starting new custom script %s from thread named %s", filename.c_str(), thread->GetName());
+
+		auto cs = new CCustomScript(filename.c_str());
 		SetScriptCondResult(thread, cs && cs->IsOK());
 		if (cs && cs->IsOK())
 		{
@@ -1059,9 +1058,9 @@ namespace CLEO {
 		{
 			if (cs) delete cs;
 			SkipUnusedParameters(thread);
-			TRACE("[0A92] Failed to load script '%s' from script '%s'.", script_name, thread->GetName());
+			TRACE("[0A92] Failed to load script '%s' from script '%s'.", filename.c_str(), thread->GetName());
 		}
-		_chdir(cwd);
+
 		return OR_CONTINUE;
 	}
 
@@ -1081,14 +1080,11 @@ namespace CLEO {
 	//0A94=-1,create_custom_mission %1d%
 	OpcodeResult __stdcall opcode_0A94(CRunningScript *thread)
 	{
-		char script_name[MAX_PATH];
-		readString(thread, script_name);
-		strcat(script_name, ".cm");		// add custom mission extension
-		TRACE("[0A94] Starting new custom mission %s from thread named %s", script_name, thread->GetName());
-		char cwd[MAX_PATH];
-		_getcwd(cwd, sizeof(cwd));
-		_chdir(cleo_dir);
-		auto cs = new CCustomScript(script_name, true);
+		auto filename = thread->ResolvePath(readString(thread), DIR_CLEO); // legacy: default search location is game\cleo directory
+		filename += ".cm"; // add custom mission extension
+		TRACE("[0A94] Starting new custom mission %s from thread named %s", filename.c_str(), thread->GetName());
+
+		auto cs = new CCustomScript(filename.c_str(), true);
 		SetScriptCondResult(thread, cs && cs->IsOK());
 		if (cs && cs->IsOK())
 		{
@@ -1102,9 +1098,9 @@ namespace CLEO {
 		{
 			if (cs) delete cs;
 			SkipUnusedParameters(thread);
-			TRACE("[0A94] Failed to load mission '%s' from script '%s'.", script_name, thread->GetName());
+			TRACE("[0A94] Failed to load mission '%s' from script '%s'.", filename.c_str(), thread->GetName());
 		}
-		_chdir(cwd);
+
 		return OR_CONTINUE;
 	}
 
@@ -1148,20 +1144,17 @@ namespace CLEO {
 		auto paramType = *thread->GetBytePointer();
 		if (paramType >= 1 && paramType <= 8)
 		{
-			// integer param
+			// numbered predefined paths
 			DWORD param;
 			*thread >> param;
-			//_chdir(param ? GetUserDirectory() : "");
-			if (param) ChangeToUserDir();
-			else ChangeToProgramDir("");
+
+			std::string path = std::to_string(param);
+			path += ":";
+			thread->SetWorkDir(path.c_str());
 		}
 		else
 		{
-			// string param
-			char buf[MAX_PATH];
-			std::fill(buf, buf + sizeof(buf), '\0');
-			GetScriptStringParam(thread, buf, (BYTE)sizeof(buf));
-			_chdir(buf);
+			thread->SetWorkDir(readString(thread));
 		}
 		return OR_CONTINUE;
 	}
@@ -1169,7 +1162,7 @@ namespace CLEO {
 	//0A9A=3,%3d% = openfile %1d% mode %2d% // IF and SET
 	OpcodeResult __stdcall opcode_0A9A(CRunningScript *thread)
 	{
-		const char *fname = readString(thread);
+		auto filename = thread->ResolvePath(readString(thread));
 		auto paramType = *thread->GetBytePointer();
 		char mode[0x10];
 
@@ -1195,7 +1188,7 @@ namespace CLEO {
 			GetScriptStringParam(thread, mode, sizeof(mode));
 		}
 
-		if (auto hfile = open_file(fname, mode, bLegacyMode))
+		if (auto hfile = open_file(filename.c_str(), mode, bLegacyMode))
 		{
 			GetInstance().OpcodeSystem.m_hFiles.insert(hfile);
 
@@ -1207,9 +1200,6 @@ namespace CLEO {
 			*thread << NULL;
 			SetScriptCondResult(thread, false);
 		}
-
-		char szBlah[MAX_PATH];
-		_getcwd(szBlah, MAX_PATH);
 
 		return OR_CONTINUE;
 	}
@@ -1295,7 +1285,9 @@ namespace CLEO {
 	//0AA2=2,%2h% = load_library %1d% // IF and SET
 	OpcodeResult __stdcall opcode_0AA2(CRunningScript *thread)
 	{
-		auto libHandle = LoadLibrary(readString(thread));
+		auto filename = thread->ResolvePath(readString(thread));
+
+		auto libHandle = LoadLibrary(filename.c_str());
 		*thread << libHandle;
 		SetScriptCondResult(thread, libHandle != nullptr);
 		if (libHandle) GetInstance().OpcodeSystem.m_hNativeLibs.insert(libHandle);
@@ -1596,7 +1588,9 @@ namespace CLEO {
 	//0AAB=1,  file_exists %1d%
 	OpcodeResult __stdcall opcode_0AAB(CRunningScript *thread)
 	{
-		DWORD fAttr = GetFileAttributes(readString(thread));
+		auto filename = thread->ResolvePath(readString(thread));
+
+		DWORD fAttr = GetFileAttributes(filename.c_str());
 		SetScriptCondResult(thread, (fAttr != INVALID_FILE_ATTRIBUTES) && !(fAttr & FILE_ATTRIBUTE_DIRECTORY));
 		return OR_CONTINUE;
 	}
@@ -1604,7 +1598,9 @@ namespace CLEO {
 	//0AAC=2,  %2d% = load_audiostream %1d%  // IF and SET
 	OpcodeResult __stdcall opcode_0AAC(CRunningScript *thread)
 	{
-		auto stream = GetInstance().SoundSystem.LoadStream(readString(thread));
+		auto filename = thread->ResolvePath(readString(thread));
+
+		auto stream = GetInstance().SoundSystem.LoadStream(filename.c_str());
 		*thread << stream;
 		SetScriptCondResult(thread, stream != nullptr);
 		return OR_CONTINUE;
@@ -1662,7 +1658,6 @@ namespace CLEO {
 	//0AB1=-1,call_scm_func %1p%
 	OpcodeResult __stdcall opcode_0AB1(CRunningScript *thread)
 	{
-		BYTE* base = nullptr;
 		int label = 0;
 
 		char* moduleTxt = nullptr;
@@ -1676,7 +1671,6 @@ namespace CLEO {
 			case DT_LVAR:
 			case DT_VAR_ARRAY:
 			case DT_LVAR_ARRAY:
-				base = thread->GetBasePointer(); // current script
 				*thread >> label;
 				break;
 
@@ -1702,26 +1696,30 @@ namespace CLEO {
 				return OR_INTERRUPT;
 			}
 		}
+
+		ScmFunction* scmFunc = new ScmFunction(thread);
 		
 		// parse module reference text
 		if (moduleTxt != nullptr)
 		{
-			std::string str(moduleTxt);
+			std::string_view str(moduleTxt);
 			auto pos = str.find('@');
 			if (pos == str.npos)
 			{
 				std::string err(128, '\0');
-				sprintf(err.data(), "Invalid module reference '%s' in 0AB1 opcode in script '%s'", str.c_str(), thread->GetScriptFileName());
+				sprintf(err.data(), "Invalid module reference '%s' in 0AB1 opcode in script '%s'", moduleTxt, thread->GetScriptFileName());
 				Error(err.data());
 				return OR_INTERRUPT;
 			}
-			str[pos] = '\0'; // split into two texts
+			std::string_view strExport = str.substr(0, pos);
+			std::string_view strModule = str.substr(pos + 1);
 
-			// get module's absolute path
-			std::string modulePath(&str[pos + 1]);
-			modulePath = ResolvePath(modulePath.c_str(), thread->GetScriptFileDir());
+			// get module's file absolute path
+			auto modulePath = std::string(strModule);
+			modulePath = thread->ResolvePath(modulePath.c_str(), DIR_SCRIPT); // by default search relative to current script location
 
-			auto scriptRef = GetInstance().ModuleSystem.GetExport(modulePath.c_str(), &str[0]);
+			// get export reference
+			auto scriptRef = GetInstance().ModuleSystem.GetExport(modulePath, strExport);
 			if (!scriptRef.Valid())
 			{
 				std::string err(128, '\0');
@@ -1729,16 +1727,17 @@ namespace CLEO {
 				Error(err.data());
 				return OR_INTERRUPT;
 			}
+			scmFunc->moduleExportRef = scriptRef.base; // to be released on return
 
-			base = (BYTE*)scriptRef.base;
+			thread->SetScriptFileDir(std::filesystem::path(modulePath).parent_path().string().c_str());
+			thread->SetScriptFileName(std::filesystem::path(modulePath).filename().string().c_str());
+			thread->SetBaseIp(scriptRef.base);
 			label = scriptRef.offset;
 		}
 
 		DWORD nParams = 0;
 		if(*thread->GetBytePointer()) *thread >> nParams;
 
-		ScmFunction* scmFunc = new ScmFunction(thread);
-		
 		static SCRIPT_VAR arguments[32];
 		SCRIPT_VAR* locals = thread->IsMission() ? missionLocals : thread->GetVarPtr();
 		SCRIPT_VAR* localsEnd = locals + 32;
@@ -1804,7 +1803,6 @@ namespace CLEO {
 		}
 
 		// jump to label
-		thread->SetBaseIp(base); // script space
 		ThreadJump(thread, label); // script offset
 		return OR_CONTINUE;
 	}
@@ -1812,8 +1810,6 @@ namespace CLEO {
 	//0AB2=-1,ret
 	OpcodeResult __stdcall opcode_0AB2(CRunningScript *thread)
 	{
-		GetInstance().ModuleSystem.ReleaseModuleRef((char*)thread->GetBasePointer()); // release module if one used
-
 		ScmFunction *scmFunc = ScmFunction::Store[reinterpret_cast<CCustomScript*>(thread)->GetScmFunction()];
 		
 		DWORD nRetParams = 0;
@@ -1823,6 +1819,10 @@ namespace CLEO {
 		scmFunc->Return(thread);
 		if (nRetParams) SetScriptParams(thread, nRetParams);
 		SkipUnusedParameters(thread);
+
+		if(scmFunc->moduleExportRef != nullptr)
+			GetInstance().ModuleSystem.ReleaseModuleRef((char*)scmFunc->moduleExportRef); // exiting export - release module
+
 		delete scmFunc;
 		return OR_CONTINUE;
 	}
@@ -1830,8 +1830,7 @@ namespace CLEO {
 	//0AB3=2,var %1d% = %2d%
 	OpcodeResult __stdcall opcode_0AB3(CRunningScript *thread)
 	{
-		DWORD	varId,
-			value;
+		DWORD varId, value;
 		*thread >> varId >> value;
 		GetInstance().ScriptEngine.CleoVariables[varId].dwParam = value;
 		return OR_CONTINUE;
@@ -2917,17 +2916,17 @@ extern "C"
 
 	CRunningScript* WINAPI CLEO_CreateCustomScript(CRunningScript* fromThread, const char *script_name, int label)
 	{
+		auto filename = fromThread->ResolvePath(script_name, DIR_CLEO); // legacy: default search location is game\cleo directory
+
 		if (label != 0) // create from label
 		{
-			TRACE("Starting new custom script from thread named %s label %i", script_name, label);
+			TRACE("Starting new custom script from thread named %s label %i", filename.c_str(), label);
 		}
 		else
 		{
-			TRACE("Starting new custom script %s", script_name);
+			TRACE("Starting new custom script %s", filename.c_str());
 		}
-		char cwd[MAX_PATH];
-		_getcwd(cwd, sizeof(cwd));
-		_chdir(cleo_dir);
+
 		// if "label == 0" then "script_name" need to be the file name
 		auto cs = new CCustomScript(script_name, false, reinterpret_cast<CCustomScript*>(fromThread), label);
 		if (fromThread) SetScriptCondResult(fromThread, cs && cs->IsOK());
@@ -2941,8 +2940,9 @@ extern "C"
 			if (cs) delete cs;
 			if (fromThread) SkipUnusedParameters(fromThread);
 			TRACE("Failed to load script '%s'.", script_name);
+			return nullptr;
 		}
-		_chdir(cwd);
+
 		return cs;
 	}
 
@@ -2961,4 +2961,18 @@ extern "C"
 		scriptDeleteDelegate -= func;
 	}
 
+	void WINAPI CLEO_ResolvePath(CRunningScript* thread, char* inOutPath, DWORD pathMaxLen)
+	{
+		if (thread == nullptr || inOutPath == nullptr || pathMaxLen < 1)
+		{
+			return; // invalid param
+		}
+
+		auto resolved = thread->ResolvePath(inOutPath);
+		
+		if (resolved.length() >= pathMaxLen)
+			resolved.resize(pathMaxLen - 1); // and terminator character
+
+		std::memcpy(inOutPath, resolved.c_str(), resolved.length() + 1); // with terminator
+	}
 }
