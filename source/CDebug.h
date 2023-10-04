@@ -27,7 +27,7 @@ public:
 
 #ifdef _DEBUG
         Trace("CLEO v%s DEBUG", CLEO_VERSION_DOT_STR);
-#elif
+#else
         Trace("CLEO v%s", CLEO_VERSION_DOT_STR);
 #endif
     }
