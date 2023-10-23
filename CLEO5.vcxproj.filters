@@ -168,7 +168,7 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="source\CLEO4.rc">
+    <ResourceCompile Include="source\CLEO5.rc">
       <Filter>source</Filter>
     </ResourceCompile>
   </ItemGroup>
