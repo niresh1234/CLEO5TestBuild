@@ -673,7 +673,7 @@ namespace CLEO
 
             if (strlen(path) > 0)
             {
-                result.push_back('\\');
+                if(!result.empty()) result.push_back('\\');
                 result.append(path);
             }
         }
