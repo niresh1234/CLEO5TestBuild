@@ -1,13 +1,13 @@
 /*
-	CLEO 4.5 header file
-	Copyright (c) 2023 Alien, Deji, Junior_Djjr, Miran
+	CLEO 5.0.0 header file
+	Copyright (c) 2023 Alien, Deji, Junior_Djjr, Miran, Seemann
 */
 #pragma once
 
 #include <wtypes.h>
 
-#define CLEO_VERSION_MAIN	4
-#define CLEO_VERSION_MAJOR	5
+#define CLEO_VERSION_MAIN	5
+#define CLEO_VERSION_MAJOR	0
 #define CLEO_VERSION_MINOR	0
 
 #define CLEO_VERSION ((CLEO_VERSION_MAIN << 24)|(CLEO_VERSION_MAJOR << 16)|(CLEO_VERSION_MINOR << 8)) // 0x0v0v0v00
