@@ -1,32 +1,45 @@
-## 4.5.0
+## 5.0.0
 
-- introduced CLEO modules feature
-- introduced DebugUtils plugin
-- new opcode 00C3 (debug_on)
-- new opcode 00C4 (debug_off)
-- new opcode 00CC (breakpoint)
-- new opcode 00CD (trace)
-- new opcode 00CE (log_to_file)
-- new opcode 0DD5 (get_game_platform)
-- new opcode 2000 (resolve_filepath)
-- new opcode 2001 (get_script_name)
-- implemented support of opcodes 0662, 0663 and 0664 (original Rockstar's script debugging opcodes. See DebugUtils.ini)
-- opcodes 0AAB, 0AE4, 0AE5, 0AE1, 0AE2 and 0AE3 moved from CLEO to File plugin. Adding "{$USE FILE}" might be required to compile some scripts
-- introduced 'virtual absolute paths'. Use prefix in file path strings to access predefined locations: "0:\" game root, "1:\" game save files directory, "2:\" this script file directory, "3:\" cleo folder, "4:\" cleo\cleo_modules
-- added more detailed error messages in some scenarios
-- on some errors instead of crashing the game just invalid script is paused
-- 0AB1 (cleo_call) and 0AB2 (cleo_return) scope now saves and restores GOSUB's call stack
-- when reading less than 4 bytes with 0A9D (readfile) now remaining bytes of the target variable are set to zero
-- fixed error in 004E (terminate_this_script) allowing to run multiple missions
-- 'argument count' parameter of 0AB1 (cleo_call) is now optional. 'cleo_call @LABEL args 0' can be written as 'cleo_call @LABEL'
-- 'argument count' parameter of 0AB2 (cleo_return) is now optional. 'cleo_return 0' can be written as 'cleo_return'
+- support for CLEO modules feature https://github.com/sannybuilder/dev/issues/264
+- new [DebugUtils](https://github.com/cleolibrary/CLEO5/tree/master/cleo_plugins/DebugUtils) plugin
+  - new opcode **00C3 ([debug_on](https://library.sannybuilder.com/#/sa/CLEO/00C3))**
+  - new opcode **00C4 ([debug_off](https://library.sannybuilder.com/#/sa/CLEO/00C4))**
+  - new opcode **00CC ([breakpoint](https://library.sannybuilder.com/#/sa/CLEO/00CC))**
+  - new opcode **00CD ([trace](https://library.sannybuilder.com/#/sa/CLEO/00CD))**
+  - new opcode **00CE ([log_to_file](https://library.sannybuilder.com/#/sa/CLEO/00CE))**
+  - implemented support of opcodes **0662**, **0663** and **0664** (original Rockstar's script debugging opcodes. See DebugUtils.ini)
+- new and updated opcodes
+  - **0DD5 ([get_game_platform](https://library.sannybuilder.com/#/sa/CLEO/0DD5))**
+  - **2000 ([resolve_filepath](https://library.sannybuilder.com/#/sa/CLEO/2000))**
+  - **2001 ([get_script_name](https://library.sannybuilder.com/#/sa/CLEO/2001))**
+  - 'argument count' parameter of **0AB1 (cleo_call)** is now optional. `cleo_call @LABEL args 0` can be written as `cleo_call @LABEL`
+  - 'argument count' parameter of **0AB2 (cleo_return)** is now optional. `cleo_return 0` can be written as `cleo_return`
+  - opcodes **0AAB**, **0AE4**, **0AE5**, **0AE1**, **0AE2** and **0AE3** moved to the [FileSystemOperations](https://github.com/cleolibrary/CLEO5/tree/master/cleo_plugins/FileSystemOperations) plugin
+- changes in file operations
+  - file paths can now use 'virtual absolute paths'. Use prefix in file path strings to access predefined locations: 
+    - `0:\` for _game root_ directory
+    - `1:\` for _game save files_ directory
+    - `2:\` for _this script file_ directory
+    - `3:\` for _CLEO_ directory
+    - `4:\` for _CLEO\cleo_modules_ directory
+  - rewritten opcode **0A99 (set_current_directory)**. It no longer affects internal game state and other scripts
+- improved error handling
+  - more detailed error messages in some scenarios
+  - some errors now cause the script to pause, instead of crashing the game
+- SCM functions **(0AB1)** now keep their own GOSUB's call stack
+
+
+### Bug Fixes
+- fixed error in **004E (terminate_this_script)** allowing to run multiple missions
 - fixed handling of strings longer than 128 characters causing errors in some cases
-- fixed error in handling of first string argument in 0AF5 (write_string to_ini_file)
+- fixed error in handling of first string argument in **0AF5 (write_string to_ini_file)**
 - fixed resolution dependent aspect ratio of CLEO text in main menu
 - fixed clearing mission locals when new CLEO mission is started
+- when reading less than 4 bytes with **0A9D (readfile)** now remaining bytes of the target variable are set to zero
+
 #### SDK AND PLUGINS
-- now all opcodes in range 0-7FFF can be registered by plugins
-- plugins moved to cleo\cleo_plugins directory
+- now all opcodes in range **0-7FFF** can be registered by plugins
+- plugins moved to _cleo\cleo_plugins_ directory
 - new SDK method: CLEO_RegisterCallback
 - new SDK method: CLEO_GetVarArgCount
 - new SDK method: CLEO_SkipUnusedVarArgs
@@ -37,11 +50,14 @@
 - new SDK method: CLEO_GetScriptDebugMode
 - new SDK method: CLEO_SetScriptDebugMode
 - new SDK method: CLEO_Log
+
 #### CLEO internal
-- updated project settings
-- updated general methods for getting and setting string parameters
-- rewritten Current Working Directory (editable with 0A99) handling. CWD changes no longer affects internal game's processes and are not globally shared among all scripts
-- updated opcodes handling
+- project migrated to VS 2022
+- configured game debugging settings
+- plugins moved into single solution
+- updated pack_release.bat script
+- added setup_env.bat script
+
 
 ## 4.4.4
 
