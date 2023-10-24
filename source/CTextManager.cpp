@@ -104,17 +104,17 @@ namespace CLEO
     CTextManager::CTextManager() : fxts(1, crc32FromUpcaseStdString)
     {
         // parse FXT files
-        FilesWalk("cleo\\cleo_text", ".fxt", [this](const char *fname)
+        FilesWalk("cleo\\cleo_text", ".fxt", [this](const char* fullPath, const char* filename)
         {
-            TRACE("Parsing FXT file %s", fname);
+            TRACE("Parsing FXT file %s", fullPath);
             try
             {
-                std::ifstream stream(fname);
+                std::ifstream stream(fullPath);
                 ParseFxtFile(stream);
             }
             catch (std::exception& ex)
             {
-                LOG_WARNING("Loading of FXT file '%s' failed: \n%s", fname, ex.what());
+                LOG_WARNING("Loading of FXT file '%s' failed: \n%s", fullPath, ex.what());
             }
         });
     }

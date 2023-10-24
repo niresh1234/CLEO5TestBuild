@@ -20,7 +20,8 @@ void FilesWalk(const char* directory, const char* extension, T callback)
                     }
                 }
 
-                callback(std::filesystem::absolute(filePath).string().c_str());
+                auto result = std::filesystem::absolute(filePath);
+                callback(result.string().c_str(), result.filename().string().c_str());
             }
         }
     }

@@ -60,9 +60,9 @@ bool CModuleSystem::LoadFile(const char* path)
 bool CModuleSystem::LoadDirectory(const char* path)
 {
 	bool result = true;
-	FilesWalk(path, ".s", [&](const char* filename)
+	FilesWalk(path, ".s", [&](const char* fullPath, const char* filename)
 	{
-		result &= LoadFile(filename);
+		result &= LoadFile(fullPath);
 	});
 
 	return result;

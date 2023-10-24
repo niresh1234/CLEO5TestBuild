@@ -1,9 +1,11 @@
 #pragma once
-#include <list>
-#include <algorithm>
-#include <windows.h>
 #include "FileEnumerator.h"
 #include "CDebug.h"
+#include <windows.h>
+#include <algorithm>
+#include <list>
+#include <CMenuSystem.h>
+
 
 namespace CLEO
 {
@@ -14,16 +16,59 @@ namespace CLEO
     public:
         CPluginSystem()
         {
+            std::set<std::string> loaded;
+
             TRACE("Loading plugins...");
-            FilesWalk("cleo\\cleo_plugins", ".cleo", [this](const char *filename)
+
+            FilesWalk("cleo\\cleo_plugins", ".cleo", [&](const char* fullPath, const char* filename)
             {
-                TRACE("Loading plugin '%s'", filename);
-                HMODULE hlib = LoadLibrary(filename);
-                if (!hlib)
+                std::string name = filename;
+                std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) { return std::tolower(c); });
+
+                if(loaded.find(name) == loaded.end())
                 {
-                    LOG_WARNING("Error loading plugin '%s'", filename);
+                    TRACE("Loading plugin '%s'", fullPath);
+                    HMODULE hlib = LoadLibrary(fullPath);
+                    if (!hlib)
+                    {
+                        LOG_WARNING("Error loading plugin '%s'", fullPath);
+                    }
+                    else 
+                    {
+                        loaded.insert(name);
+                        plugins.push_back(hlib);
+                    }
                 }
-                else plugins.push_back(hlib);
+                else
+                {
+                    LOG_WARNING("Plugin `%s` already loaded. Skipping '%s'", name.c_str(), fullPath);
+                }
+            });
+
+            // load plugins from legacy location
+            FilesWalk("cleo", ".cleo", [&](const char* fullPath, const char* filename)
+            {
+                std::string name = filename;
+                std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) { return std::tolower(c); });
+
+                if(loaded.find(name) == loaded.end())
+                {
+                    TRACE("Loading plugin '%s'", fullPath);
+                    HMODULE hlib = LoadLibrary(fullPath);
+                    if (!hlib)
+                    {
+                        LOG_WARNING("Error loading plugin '%s'", fullPath);
+                    }
+                    else
+                    {
+                        loaded.insert(name);
+                        plugins.push_back(hlib);
+                    }
+                }
+                else
+                {
+                    LOG_WARNING("Plugin `%s` already loaded. Skipping '%s'", name.c_str(), fullPath);
+                }
             });
         }
 

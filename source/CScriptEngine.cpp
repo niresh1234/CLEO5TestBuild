@@ -989,18 +989,18 @@ namespace CLEO
 
         TRACE("Searching for cleo scripts");
 
-        FilesWalk(scriptsDir.c_str(), cs_ext, [this](const char *filename) {
-            auto cs = LoadScript(filename);
+        FilesWalk(scriptsDir.c_str(), cs_ext, [this](const char* fullPath, const char* filename) {
+            auto cs = LoadScript(fullPath);
             cs->SetDebugMode(NativeScriptsDebugMode); // inherit from global state
         });
 
-        FilesWalk(scriptsDir.c_str(), cs4_ext, [this](const char *filename) {
-            auto cs = LoadScript(filename);
+        FilesWalk(scriptsDir.c_str(), cs4_ext, [this](const char* fullPath, const char* filename) {
+            auto cs = LoadScript(fullPath);
             if (cs) cs->SetCompatibility(CLEO_VER_4);
         });
 
-        FilesWalk(scriptsDir.c_str(), cs3_ext, [this](const char *filename) {
-            auto cs = LoadScript(filename);
+        FilesWalk(scriptsDir.c_str(), cs3_ext, [this](const char* fullPath, const char* filename) {
+            auto cs = LoadScript(fullPath);
             if (cs) cs->SetCompatibility(CLEO_VER_3);
         });
 
