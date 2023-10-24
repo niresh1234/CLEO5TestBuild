@@ -669,8 +669,13 @@ namespace CLEO
         if (strlen(path) < 2 || path[1] != ':') // does not start with drive letter
         {
             result = (customWorkDir != nullptr) ? customWorkDir : GetWorkDir();
-            if (!result.empty() && result.back() != '\\') result.push_back('\\');
-            result += path;
+            if (!result.empty() && result.back() == '\\') result.pop_back();
+
+            if (strlen(path) > 0)
+            {
+                if(!result.empty()) result.push_back('\\');
+                result.append(path);
+            }
         }
         else
         {
