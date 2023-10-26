@@ -1317,7 +1317,7 @@ namespace CLEO {
 			GetInstance().CodeInjector.MemoryRead(Address, (DWORD)opcodeParams[0].dwParam, vp);
 			break;
 		default:
-			SHOW_ERROR("Invalid size param (%d) of opcode [0A8D])", size);
+			SHOW_ERROR("Invalid size param (%d) of opcode [0A8D] in script %s", size, ((CCustomScript*)thread)->GetInfoStr().c_str());
 		}
 
 		SetScriptParams(thread, 1);
@@ -1390,7 +1390,8 @@ namespace CLEO {
 		CCustomScript *cs = reinterpret_cast<CCustomScript *>(thread);
 		if (thread->IsMission() || !cs->IsCustom())
 		{
-			LOG_WARNING("[0A93] Incorrect usage of opcode in script '%s'", ((CCustomScript*)thread)->GetInfoStr().c_str());
+			LOG_WARNING("Incorrect usage of opcode [0A93] in script %s", ((CCustomScript*)thread)->GetInfoStr().c_str());
+
 			return OR_CONTINUE;
 		}
 		GetInstance().ScriptEngine.RemoveCustomScript(cs);
@@ -2012,7 +2013,8 @@ namespace CLEO {
 
 			default:
 			{
-				SHOW_ERROR("Invalid first argument type (%02X) of [0AB1] opcode in script '%s' \nScript suspended.", *thread->GetBytePointer(), ((CCustomScript*)thread)->GetInfoStr().c_str());
+				SHOW_ERROR("Invalid type (%02X) of the first argument in opcode [0AB1] in script %s \nScript suspended.", *thread->GetBytePointer(), ((CCustomScript*)thread)->GetInfoStr().c_str());
+
 				return CCustomOpcodeSystem::ErrorSuspendScript(thread);
 			}
 		}
@@ -2026,7 +2028,7 @@ namespace CLEO {
 			auto pos = str.find('@');
 			if (pos == str.npos)
 			{
-				SHOW_ERROR("Invalid module reference '%s' in 0AB1 opcode in script '%s' \nScript suspended.", moduleTxt, ((CCustomScript*)thread)->GetInfoStr().c_str());
+				SHOW_ERROR("Invalid module reference '%s' in opcode [0AB1] in script %s \nScript suspended.", moduleTxt, ((CCustomScript*)thread)->GetInfoStr().c_str());
 				return CCustomOpcodeSystem::ErrorSuspendScript(thread);
 			}
 			std::string_view strExport = str.substr(0, pos);
@@ -2040,7 +2042,7 @@ namespace CLEO {
 			auto scriptRef = GetInstance().ModuleSystem.GetExport(modulePath, strExport);
 			if (!scriptRef.Valid())
 			{
-				SHOW_ERROR("Not found module '%s' export '%s', requested by 0AB1 opcode in script '%s'", modulePath.c_str(), &str[0], ((CCustomScript*)thread)->GetInfoStr().c_str());
+				SHOW_ERROR("Not found module '%s' export '%s', requested by opcode [0AB1] in script %s", modulePath.c_str(), &str[0], ((CCustomScript*)thread)->GetInfoStr().c_str());
 				return CCustomOpcodeSystem::ErrorSuspendScript(thread);
 			}
 			scmFunc->moduleExportRef = scriptRef.base; // to be released on return
@@ -2053,6 +2055,12 @@ namespace CLEO {
 
 		DWORD nParams = 0;
 		if(*thread->GetBytePointer()) *thread >> nParams;
+		if(nParams > 32)
+		{
+			SHOW_ERROR("Argument count (%d), out of supported range (32) of opcode [0AB1] in script %s", nParams, ((CCustomScript*)thread)->GetInfoStr().c_str());
+
+			return CCustomOpcodeSystem::ErrorSuspendScript(thread);
+		}
 
 		static SCRIPT_VAR arguments[32];
 		SCRIPT_VAR* locals = thread->IsMission() ? missionLocals : thread->GetVarPtr();
@@ -2678,7 +2686,7 @@ namespace CLEO {
 		*thread >> mi;
 
 		CVehicleModelInfo* model;
-		// if 1.0 US, prefer GetModelInfo function — makes it compatible with fastman92's limit adjuster
+		// if 1.0 US, prefer GetModelInfo function Â— makes it compatible with fastman92's limit adjuster
 		if (CLEO::GetInstance().VersionManager.GetGameVersion() == CLEO::GV_US10) {
 			model = plugin::CallAndReturn<CVehicleModelInfo *, 0x403DA0, int>(mi);
 		}
@@ -2705,7 +2713,7 @@ namespace CLEO {
 		*thread >> mi;
 
 		CVehicleModelInfo* model;
-		// if 1.0 US, prefer GetModelInfo function — makes it compatible with fastman92's limit adjuster
+		// if 1.0 US, prefer GetModelInfo function Â— makes it compatible with fastman92's limit adjuster
 		if (CLEO::GetInstance().VersionManager.GetGameVersion() == CLEO::GV_US10) {
 			model = plugin::CallAndReturn<CVehicleModelInfo *, 0x403DA0, int>(mi);
 		}
