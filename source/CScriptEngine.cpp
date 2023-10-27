@@ -983,26 +983,32 @@ namespace CLEO
         }
 
         // [game root]\cleo
-        std::string scriptsDir = CFileMgr::ms_rootDirName;
+        /*std::string scriptsDir = CFileMgr::ms_rootDirName;
         if (!scriptsDir.empty() && scriptsDir.back() != '\\') scriptsDir.push_back('\\');
-        scriptsDir += "cleo";
+        scriptsDir += "cleo";*/
+        std::string scriptsDir = "cleo"; // TODO: restore to absolute path when ModLoader is updated to support CLEO5
 
         TRACE("Searching for cleo scripts");
 
-        FilesWalk(scriptsDir.c_str(), cs_ext, [this](const char* fullPath, const char* filename) {
-            auto cs = LoadScript(fullPath);
-            cs->SetDebugMode(NativeScriptsDebugMode); // inherit from global state
+        CCustomScript* cs = nullptr;
+        FilesWalk(scriptsDir.c_str(), cs_ext, [&](const char* fullPath, const char* filename) {
+            cs = LoadScript(fullPath);
         });
 
-        FilesWalk(scriptsDir.c_str(), cs4_ext, [this](const char* fullPath, const char* filename) {
-            auto cs = LoadScript(fullPath);
+        FilesWalk(scriptsDir.c_str(), cs4_ext, [&](const char* fullPath, const char* filename) {
+            cs = LoadScript(fullPath);
             if (cs) cs->SetCompatibility(CLEO_VER_4);
         });
 
-        FilesWalk(scriptsDir.c_str(), cs3_ext, [this](const char* fullPath, const char* filename) {
-            auto cs = LoadScript(fullPath);
+        FilesWalk(scriptsDir.c_str(), cs3_ext, [&](const char* fullPath, const char* filename) {
+            cs = LoadScript(fullPath);
             if (cs) cs->SetCompatibility(CLEO_VER_3);
         });
+
+        if (cs != nullptr)
+        {
+            cs->SetDebugMode(NativeScriptsDebugMode); // inherit from global state
+        }
 
         for (void* func : GetInstance().GetCallbacks(eCallbackId::ScriptsLoaded))
         {
