@@ -1,9 +1,27 @@
 #include "stdafx.h"
 #include "CDebug.h"
 #include "CleoBase.h"
+#include <shellapi.h>
 
 CDebug Debug;
 using namespace CLEO;
+
+std::string stringPrintf(const char* format, ...)
+{
+    va_list args;
+
+    va_start(args, format);
+    auto len = std::vsnprintf(nullptr, 0, format, args) + 1;
+    va_end(args);
+    
+    std::string result(len, '\0');
+
+    va_start(args, format);
+    std::vsnprintf(result.data(), result.length(), format, args);
+    va_end(args);
+
+    return result;
+}
 
 void CDebug::Trace(eLogLevel level, const char* format, ...)
 {
@@ -59,12 +77,25 @@ void CDebug::Error(const char* format, ...)
     auto msg = TraceVArg(eLogLevel::Error, format, args);
     va_end(args);
 
+    QUERY_USER_NOTIFICATION_STATE pquns;
+    SHQueryUserNotificationState(&pquns);
+    bool fullscreen = (pquns == QUNS_BUSY) || (pquns == QUNS_RUNNING_D3D_FULL_SCREEN) || (pquns == QUNS_PRESENTATION_MODE);
+    
     auto mainWnd = GetInstance().MainWnd;
-    PostMessage(mainWnd, WM_SYSCOMMAND, SC_MINIMIZE, 0);
-    ShowWindow(mainWnd, SW_MINIMIZE);
+
+    if(fullscreen)
+    {
+        PostMessage(mainWnd, WM_SYSCOMMAND, SC_MINIMIZE, 0);
+        ShowWindow(mainWnd, SW_MINIMIZE);
+    }
+
     MessageBox(mainWnd, msg, "CLEO error", MB_SYSTEMMODAL | MB_TOPMOST | MB_ICONERROR | MB_OK);
-    PostMessage(mainWnd, WM_SYSCOMMAND, SC_RESTORE, 0);
-    ShowWindow(mainWnd, SW_RESTORE);
+
+    if (fullscreen)
+    {
+        PostMessage(mainWnd, WM_SYSCOMMAND, SC_RESTORE, 0);
+        ShowWindow(mainWnd, SW_RESTORE);
+    }
 }
 
 extern "C" 

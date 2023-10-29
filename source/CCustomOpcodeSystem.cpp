@@ -9,7 +9,12 @@
 #include <filesystem>
 #include <sstream>
 
-namespace CLEO {
+#define OPCODE_VALIDATE_STR_ARG_READ(x) if((void*)x == nullptr) { SHOW_ERROR("%s in script %s \nScript suspended.", lastErrorMsg.c_str(), ((CCustomScript*)thread)->GetInfoStr().c_str()); return CCustomOpcodeSystem::ErrorSuspendScript(thread); }
+#define OPCODE_VALIDATE_STR_ARG_WRITE(x) if((void*)x == nullptr) { SHOW_ERROR("%s in script %s \nScript suspended.", lastErrorMsg.c_str(), ((CCustomScript*)thread)->GetInfoStr().c_str()); return CCustomOpcodeSystem::ErrorSuspendScript(thread); }
+#define OPCODE_READ_FORMATTED_STRING(thread, buf, bufSize, format) if(ReadFormattedString(thread, buf, bufSize, format) == -1) { SHOW_ERROR("%s in script %s \nScript suspended.", lastErrorMsg.c_str(), ((CCustomScript*)thread)->GetInfoStr().c_str()); return CCustomOpcodeSystem::ErrorSuspendScript(thread); }
+
+namespace CLEO 
+{
 	DWORD FUNC_fopen;
 	DWORD FUNC_fclose;
 	DWORD FUNC_fwrite;
@@ -161,10 +166,15 @@ namespace CLEO {
 	WORD CCustomOpcodeSystem::lastOpcode = 0;
 	WORD* CCustomOpcodeSystem::lastOpcodePtr = nullptr;
 	WORD CCustomOpcodeSystem::lastCustomOpcode = 0;
+	std::string lastErrorMsg = {};
+	WORD CCustomOpcodeSystem::prevOpcode = 0;
+
 
 	// opcode handler for custom opcodes
 	OpcodeResult __fastcall CCustomOpcodeSystem::customOpcodeHandler(CRunningScript *thread, int dummy, WORD opcode)
 	{
+		prevOpcode = lastOpcode;
+
 		lastScript = thread;
 		lastOpcode = opcode;
 		lastOpcodePtr = (WORD*)thread->GetBytePointer() - 1; // rewind to the opcode start
@@ -465,7 +475,7 @@ namespace CLEO {
 				break;
 
 			default:
-				LOG_WARNING("Reading integer from invalid argument type (%02X) in script %s", paramType, ((CCustomScript*)&thread)->GetInfoStr().c_str());
+				LOG_WARNING("Reading integer argument, got %s in script %s", ToKindStr(paramType), ((CCustomScript*)&thread)->GetInfoStr().c_str());
 		}
 
 		GetScriptParams(&thread, 1);
@@ -489,7 +499,7 @@ namespace CLEO {
 				break;
 
 			default:
-				LOG_WARNING("Writing integer into invalid argument type (%02X) in script %s", paramType, ((CCustomScript*)&thread)->GetInfoStr().c_str());
+				LOG_WARNING("Writing integer, got argument type %s in script %s", ToKindStr(paramType), ((CCustomScript*)&thread)->GetInfoStr().c_str());
 		}
 
 		opcodeParams[0].dwParam = uval;
@@ -513,7 +523,7 @@ namespace CLEO {
 				break;
 
 			default:
-				LOG_WARNING("Reading integer from invalid argument type (%02X) in script %s", paramType, ((CCustomScript*)&thread)->GetInfoStr().c_str());
+				LOG_WARNING("Reading integer argument, got %s in script %s", ToKindStr(paramType), ((CCustomScript*)&thread)->GetInfoStr().c_str());
 		}
 
 		GetScriptParams(&thread, 1);
@@ -537,7 +547,7 @@ namespace CLEO {
 				break;
 
 			default:
-				LOG_WARNING("Writing integer into invalid argument type (%02X) in script %s", paramType, ((CCustomScript*)&thread)->GetInfoStr().c_str());
+				LOG_WARNING("Writing integer, got argument type %s in script %s", ToKindStr(paramType), ((CCustomScript*)&thread)->GetInfoStr().c_str());
 		}
 
 		opcodeParams[0].nParam = nval;
@@ -558,7 +568,7 @@ namespace CLEO {
 				break;
 
 			default:
-				LOG_WARNING("Reading float from invalid argument type (%02X) in script %s", paramType, ((CCustomScript*)&thread)->GetInfoStr().c_str());
+				LOG_WARNING("Reading float argument, got %s in script %s", ToKindStr(paramType), ((CCustomScript*)&thread)->GetInfoStr().c_str());
 		}
 
 		GetScriptParams(&thread, 1);
@@ -578,7 +588,7 @@ namespace CLEO {
 				break;
 
 			default:
-				LOG_WARNING("Writing float into invalid argument type (%02X) in script %s", paramType, ((CCustomScript*)&thread)->GetInfoStr().c_str());
+				LOG_WARNING("Writing float, got argument type %s in script %s", ToKindStr(paramType), ((CCustomScript*)&thread)->GetInfoStr().c_str());
 		}
 
 		opcodeParams[0].fParam = fval;
@@ -640,6 +650,9 @@ namespace CLEO {
 	{
 		static char internal_buf[MAX_STR_LEN];
 		if (!buf) { buf = internal_buf; bufSize = MAX_STR_LEN; }
+		const auto bufLength = bufSize ? bufSize - 1 : 0; // max text length (minus terminator char)
+
+		lastErrorMsg.clear();
 
 		auto paramType = CLEO_GetOperandType(thread);
 		switch(paramType)
@@ -652,23 +665,27 @@ namespace CLEO {
 			case DT_LVAR_ARRAY:
 			{
 				GetScriptParams(thread, 1);
-				char* str = opcodeParams[0].pcParam;
-
-				size_t length;
-				if(str != nullptr)
-					length = strlen(str);
-				else
+				
+				if(opcodeParams[0].dwParam <= CCustomOpcodeSystem::MinValidAddress)
 				{
-					length = 0;
-					LOG_WARNING("Reading string from null pointer in script %s", ((CCustomScript*)thread)->GetInfoStr().c_str());
+					lastErrorMsg = (opcodeParams[0].dwParam == 0) ?
+						"Reading string from 'null' pointer argument" :
+						stringPrintf("Reading string from invalid '0x%X' pointer argument", opcodeParams[0].dwParam);
+
+					return nullptr; // error, target buffer untouched
 				}
 
-				if(bufSize > 0)
-					length = min(length, bufSize - 1); // minus terminator char
-				else
-					length = 0; // no target buffer
+				char* str = opcodeParams[0].pcParam;
+				auto length = strlen(str);
+
+				if(length > bufLength)
+				{
+					lastErrorMsg = stringPrintf("Target buffer too small (%d) to read whole string (%d) from argument", bufLength, length);
+					length = bufLength; // clamp to target buffer size
+				}
 
 				if (length) strncpy(buf, str, length);
+
 				if (bufSize > 0) buf[length] = '\0'; // string terminator
 				return buf;
 			}
@@ -701,10 +718,11 @@ namespace CLEO {
 					char* str = (char*)thread->GetBytePointer();
 					thread->IncPtr(length); // text data
 
-					if (bufSize > 0)
-						length = min(length, bufSize - 1); // minus terminator char
-					else
-						length = 0; // no target buffer
+					if (length > bufLength)
+					{
+						lastErrorMsg = stringPrintf("Target buffer too small (%d) to read whole string (%d) from argument", bufLength, length);
+						length = bufLength; // clamp to target buffer size
+					}
 
 					if (length) strncpy(buf, str, length);
 					if (bufSize > 0) buf[length] = '\0'; // string terminator
@@ -721,8 +739,8 @@ namespace CLEO {
 
 		// unsupported param type
 		GetScriptParams(thread, 1); // skip unhandled param
-		SHOW_ERROR("Reading string from invalid argument type (%02X) in script %s", paramType, ((CCustomScript*)thread)->GetInfoStr().c_str());
-		return nullptr;
+		lastErrorMsg = stringPrintf("Reading string argument, got %s", ToKindStr(paramType));
+		return nullptr; // error, target buffer untouched
 	}
 
 	// write output\result string parameter
@@ -749,6 +767,8 @@ namespace CLEO {
 		char* targetBuff;
 		DWORD targetSize;
 
+		lastErrorMsg.clear();
+
 		auto paramType = CLEO_GetOperandType(thread);
 		switch(paramType)
 		{
@@ -759,6 +779,12 @@ namespace CLEO {
 			case DT_VAR_ARRAY:
 			case DT_LVAR_ARRAY:
 				GetScriptParams(thread, 1);
+
+				if (opcodeParams[0].dwParam <= CCustomOpcodeSystem::MinValidAddress)
+				{
+					lastErrorMsg = stringPrintf("Writing string into invalid '0x%X' pointer argument", opcodeParams[0].dwParam);
+					return { nullptr, 0 }; // error
+				}
 				return { opcodeParams[0].pcParam, 0x7FFFFFFF }; // user allocated memory block can be any size
 
 			// short string variable
@@ -777,9 +803,9 @@ namespace CLEO {
 
 			default:
 			{
-				SHOW_ERROR("Outputing string into invalid argument type (%02X) in script %s", paramType, ((CCustomScript*)thread)->GetInfoStr().c_str());
+				lastErrorMsg = stringPrintf("Writing string, got argument %s", ToKindStr(paramType));
 				CLEO_SkipOpcodeParams(thread, 1); // skip unhandled param
-				return { nullptr, 0 };
+				return { nullptr, 0 }; // error
 			}
 		}
 	}
@@ -792,11 +818,14 @@ namespace CLEO {
 		char* outIter = outputStr;
 		char bufa[256], fmtbufa[64], *fmta;
 
+		lastErrorMsg.clear();
+
 		// invalid input arguments
-		if(outputStr == nullptr || len == 0) 
+		if(outputStr == nullptr || len == 0)
 		{
+			lastErrorMsg = "Need target buffer to read formatted string";
 			SkipUnusedVarArgs(thread);
-			return -1;
+			return -1; // error
 		}
 
 		if(len > 1 && format != nullptr)
@@ -874,14 +903,29 @@ namespace CLEO {
 					{
 					case 's':
 					{
-						static const char none[] = "(null)";
 						if (CLEO_GetOperandType(thread) == DT_END) goto _ReadFormattedString_ArgMissing;
-						const char *astr = ReadStringParam(thread, bufa, sizeof(bufa));
-						const char *striter = astr ? astr : none;
-						while (*striter)
+
+						const char* str = ReadStringParam(thread, bufa, sizeof(bufa));
+						if(str == nullptr) // read error
+						{
+							if(lastErrorMsg.find("'null' pointer") != std::string::npos)
+							{
+								static const char none[] = "(null)";
+								str = none;
+							}
+							else
+							{
+								// lastErrorMsg already set by ReadStringParam
+								SkipUnusedVarArgs(thread);
+								outputStr[written] = '\0';
+								return -1; // error
+							}
+						}
+						
+						while (*str)
 						{
 							if (written++ >= len) goto _ReadFormattedString_OutOfMemory;
-							*outIter++ = *striter++;
+							*outIter++ = *str++;
 						}
 						iter++;
 						break;
@@ -941,28 +985,30 @@ namespace CLEO {
 
 		if (written >= len)
 		{
-			_ReadFormattedString_OutOfMemory: // jump here on error
-			LOG_WARNING("Read formatted string error: Insufficient output buffer size in script %s", ((CCustomScript*)thread)->GetInfoStr().c_str());
+		_ReadFormattedString_OutOfMemory: // jump here on error
+
+			lastErrorMsg = stringPrintf("Target buffer too small (%d) to read whole formatted string", len);
 			SkipUnusedVarArgs(thread);
 			outputStr[len - 1] = '\0';
-			return -1;
+			return -1; // error
 		}
 
 		// still more var-args available
 		if (CLEO_GetOperandType(thread) != DT_END)
 		{
-			LOG_WARNING("Read formatted string: Found more params than format slots in script %s", ((CCustomScript*)thread)->GetInfoStr().c_str());
+			lastErrorMsg = "More params than slots in formatted string";
+			LOG_WARNING("%s in script %s", lastErrorMsg.c_str(), ((CCustomScript*)thread)->GetInfoStr().c_str());
 		}
 		SkipUnusedVarArgs(thread); // skip terminator too
 
 		outputStr[written] = '\0';
 		return (int)written;
 
-		_ReadFormattedString_ArgMissing: // jump here on error
-		LOG_WARNING("Read formatted string: Not enough arguments to fulfill specified format in script %s", ((CCustomScript*)thread)->GetInfoStr().c_str());
+	_ReadFormattedString_ArgMissing: // jump here on error
+		lastErrorMsg = "Less params than slots in formatted string";
 		thread->IncPtr(); // skip vararg terminator
 		outputStr[written] = '\0';
-		return (int)written;
+		return -1; // error
 	}
 
 	// Legacy modes for CLEO 3
@@ -1383,7 +1429,9 @@ namespace CLEO {
 	//0A92=-1,create_custom_thread %1d%
 	OpcodeResult __stdcall opcode_0A92(CRunningScript *thread)
 	{
-		auto filename = reinterpret_cast<CCustomScript*>(thread)->ResolvePath(ReadStringParam(thread), DIR_CLEO); // legacy: default search location is game\cleo directory
+		auto path = ReadStringParam(thread); OPCODE_VALIDATE_STR_ARG_READ(path)
+
+		auto filename = reinterpret_cast<CCustomScript*>(thread)->ResolvePath(path, DIR_CLEO); // legacy: default search location is game\cleo directory
 		TRACE("[0A92] Starting new custom script %s from thread named %s", filename.c_str(), thread->GetName());
 
 		auto cs = new CCustomScript(filename.c_str());
@@ -1421,7 +1469,9 @@ namespace CLEO {
 	//0A94=-1,create_custom_mission %1d%
 	OpcodeResult __stdcall opcode_0A94(CRunningScript *thread)
 	{
-		auto filename = reinterpret_cast<CCustomScript*>(thread)->ResolvePath(ReadStringParam(thread), DIR_CLEO); // legacy: default search location is game\cleo directory
+		auto path = ReadStringParam(thread); OPCODE_VALIDATE_STR_ARG_READ(path)
+
+		auto filename = reinterpret_cast<CCustomScript*>(thread)->ResolvePath(path, DIR_CLEO); // legacy: default search location is game\cleo directory
 		filename += ".cm"; // add custom mission extension
 		TRACE("[0A94] Starting new custom mission %s from thread named %s", filename.c_str(), thread->GetName());
 
@@ -1511,7 +1561,8 @@ namespace CLEO {
 		}
 		else
 		{
-			reinterpret_cast<CCustomScript*>(thread)->SetWorkDir(ReadStringParam(thread));
+			auto path = ReadStringParam(thread); OPCODE_VALIDATE_STR_ARG_READ(path)
+			reinterpret_cast<CCustomScript*>(thread)->SetWorkDir(path);
 		}
 		return OR_CONTINUE;
 	}
@@ -1519,7 +1570,9 @@ namespace CLEO {
 	//0A9A=3,%3d% = openfile %1d% mode %2d% // IF and SET
 	OpcodeResult __stdcall opcode_0A9A(CRunningScript *thread)
 	{
-		auto filename = reinterpret_cast<CCustomScript*>(thread)->ResolvePath(ReadStringParam(thread));
+		auto path = ReadStringParam(thread); OPCODE_VALIDATE_STR_ARG_READ(path)
+
+		auto filename = reinterpret_cast<CCustomScript*>(thread)->ResolvePath(path);
 		auto paramType = *thread->GetBytePointer();
 		char mode[0x10];
 
@@ -1541,8 +1594,8 @@ namespace CLEO {
 		}
 		else
 		{
-			// string param
-			ReadStringParam(thread, mode, sizeof(mode));
+			auto modeOk = ReadStringParam(thread, mode, sizeof(mode)); 
+			OPCODE_VALIDATE_STR_ARG_READ(modeOk)
 		}
 
 		if (auto hfile = open_file(filename.c_str(), mode, bLegacyMode))
@@ -1642,7 +1695,9 @@ namespace CLEO {
 	//0AA2=2,%2h% = load_library %1d% // IF and SET
 	OpcodeResult __stdcall opcode_0AA2(CRunningScript *thread)
 	{
-		auto filename = reinterpret_cast<CCustomScript*>(thread)->ResolvePath(ReadStringParam(thread));
+		auto path = ReadStringParam(thread); OPCODE_VALIDATE_STR_ARG_READ(path)
+
+		auto filename = reinterpret_cast<CCustomScript*>(thread)->ResolvePath(path);
 
 		auto libHandle = LoadLibrary(filename.c_str());
 		*thread << libHandle;
@@ -1665,7 +1720,8 @@ namespace CLEO {
 	//0AA4=3,%3d% = get_proc_address %1d% library %2d% // IF and SET
 	OpcodeResult __stdcall opcode_0AA4(CRunningScript *thread)
 	{
-		char *funcName = ReadStringParam(thread);
+		auto funcName = ReadStringParam(thread); OPCODE_VALIDATE_STR_ARG_READ(funcName)
+
 		HMODULE libHandle;
 		*thread >> libHandle;
 		void *funcAddr = (void *)GetProcAddress(libHandle, funcName);
@@ -1943,7 +1999,7 @@ namespace CLEO {
 	//0AAA=2,  %2d% = thread %1d% pointer  // IF and SET
 	OpcodeResult __stdcall opcode_0AAA(CRunningScript *thread)
 	{
-		char *threadName = ReadStringParam(thread);
+		auto threadName = ReadStringParam(thread); OPCODE_VALIDATE_STR_ARG_READ(threadName)
 		threadName[7] = '\0';
 		CRunningScript *cs = GetInstance().ScriptEngine.FindCustomScriptNamed(threadName);
 		if (!cs) cs = GetInstance().ScriptEngine.FindScriptNamed(threadName);
@@ -1955,7 +2011,8 @@ namespace CLEO {
 	//0AAC=2,  %2d% = load_audiostream %1d%  // IF and SET
 	OpcodeResult __stdcall opcode_0AAC(CRunningScript *thread)
 	{
-		auto filename = reinterpret_cast<CCustomScript*>(thread)->ResolvePath(ReadStringParam(thread));
+		auto path = ReadStringParam(thread); OPCODE_VALIDATE_STR_ARG_READ(path)
+		auto filename = reinterpret_cast<CCustomScript*>(thread)->ResolvePath(path);
 
 		auto stream = GetInstance().SoundSystem.LoadStream(filename.c_str());
 		*thread << stream;
@@ -2018,7 +2075,8 @@ namespace CLEO {
 		int label = 0;
 
 		char* moduleTxt = nullptr;
-		switch (*thread->GetBytePointer())
+		auto paramType = CLEO_GetOperandType(thread);
+		switch (paramType)
 		{
 			// label of current script
 			case DT_DWORD:
@@ -2046,7 +2104,7 @@ namespace CLEO {
 				break;
 
 			default:
-				SHOW_ERROR("Invalid type (%02X) of the first argument in opcode [0AB1] in script %s \nScript suspended.", *thread->GetBytePointer(), ((CCustomScript*)thread)->GetInfoStr().c_str());
+				SHOW_ERROR("Invalid type (%s) of the first argument in opcode [0AB1] in script %s \nScript suspended.", ToKindStr(paramType), ((CCustomScript*)thread)->GetInfoStr().c_str());
 				return CCustomOpcodeSystem::ErrorSuspendScript(thread);
 		}
 
@@ -2295,7 +2353,8 @@ namespace CLEO {
 	//0ABA=1,end_custom_thread_named %1d%
 	OpcodeResult __stdcall opcode_0ABA(CRunningScript *thread)
 	{
-		char *threadName = ReadStringParam(thread);
+		auto threadName = ReadStringParam(thread); OPCODE_VALIDATE_STR_ARG_READ(threadName)
+
 		auto deleted_thread = GetInstance().ScriptEngine.FindCustomScriptNamed(threadName);
 		if (deleted_thread)
 		{
@@ -2365,7 +2424,9 @@ namespace CLEO {
 	//0AC1=2,%2d% = load_audiostream_with_3d_support %1d% //IF and SET
 	OpcodeResult __stdcall opcode_0AC1(CRunningScript *thread)
 	{
-		auto stream = GetInstance().SoundSystem.LoadStream(ReadStringParam(thread), true);
+		auto path = ReadStringParam(thread); OPCODE_VALIDATE_STR_ARG_READ(path)
+
+		auto stream = GetInstance().SoundSystem.LoadStream(path, true);
 		*thread << stream;
 		SetScriptCondResult(thread, stream != nullptr);
 		return OR_CONTINUE;
@@ -2456,14 +2517,15 @@ namespace CLEO {
 	//0ACA=1,show_text_box %1d%
 	OpcodeResult __stdcall opcode_0ACA(CRunningScript *thread)
 	{
-		PrintHelp(ReadStringParam(thread));
+		auto text = ReadStringParam(thread); OPCODE_VALIDATE_STR_ARG_READ(text)
+		PrintHelp(text);
 		return OR_CONTINUE;
 	}
 
 	//0ACB=3,show_styled_text %1d% time %2d% style %3d%
 	OpcodeResult __stdcall opcode_0ACB(CRunningScript *thread)
 	{
-		auto text = ReadStringParam(thread);
+		auto text = ReadStringParam(thread); OPCODE_VALIDATE_STR_ARG_READ(text)
 		DWORD time; *thread >> time;
 		DWORD style; *thread >> style;
 
@@ -2474,7 +2536,7 @@ namespace CLEO {
 	//0ACC=2,show_text_lowpriority %1d% time %2d%
 	OpcodeResult __stdcall opcode_0ACC(CRunningScript *thread)
 	{
-		auto text = ReadStringParam(thread);
+		auto text = ReadStringParam(thread); OPCODE_VALIDATE_STR_ARG_READ(text)
 		DWORD time; *thread >> time;
 
 		Print(text, time);
@@ -2484,7 +2546,7 @@ namespace CLEO {
 	//0ACD=2,show_text_highpriority %1d% time %2d%
 	OpcodeResult __stdcall opcode_0ACD(CRunningScript *thread)
 	{
-		auto text = ReadStringParam(thread);
+		auto text = ReadStringParam(thread); OPCODE_VALIDATE_STR_ARG_READ(text)
 		DWORD time; *thread >> time;
 
 		PrintNow(text, time);
@@ -2494,8 +2556,8 @@ namespace CLEO {
 	//0ACE=-1,show_formatted_text_box %1d%
 	OpcodeResult __stdcall opcode_0ACE(CRunningScript *thread)
 	{
-		auto format = ReadStringParam(thread);
-		char text[MAX_STR_LEN]; ReadFormattedString(thread, text, sizeof(text), format);
+		auto format = ReadStringParam(thread); OPCODE_VALIDATE_STR_ARG_READ(format)
+		char text[MAX_STR_LEN]; OPCODE_READ_FORMATTED_STRING(thread, text, sizeof(text), format)
 
 		PrintHelp(text);
 		return OR_CONTINUE;
@@ -2504,10 +2566,10 @@ namespace CLEO {
 	//0ACF=-1,show_formatted_styled_text %1d% time %2d% style %3d%
 	OpcodeResult __stdcall opcode_0ACF(CRunningScript *thread)
 	{
-		auto format = ReadStringParam(thread);
+		auto format = ReadStringParam(thread); OPCODE_VALIDATE_STR_ARG_READ(format)
 		DWORD time; *thread >> time;
 		DWORD style; *thread >> style;
-		char text[MAX_STR_LEN]; ReadFormattedString(thread, text, sizeof(text), format);
+		char text[MAX_STR_LEN]; OPCODE_READ_FORMATTED_STRING(thread, text, sizeof(text), format)
 
 		PrintBig(text, time, style);
 		return OR_CONTINUE;
@@ -2516,9 +2578,9 @@ namespace CLEO {
 	//0AD0=-1,show_formatted_text_lowpriority %1d% time %2d%
 	OpcodeResult __stdcall opcode_0AD0(CRunningScript *thread)
 	{
-		auto format = ReadStringParam(thread);
+		auto format = ReadStringParam(thread); OPCODE_VALIDATE_STR_ARG_READ(format)
 		DWORD time; *thread >> time;
-		char text[MAX_STR_LEN]; ReadFormattedString(thread, text, sizeof(text), format);
+		char text[MAX_STR_LEN]; OPCODE_READ_FORMATTED_STRING(thread, text, sizeof(text), format)
 
 		Print(text, time);
 		return OR_CONTINUE;
@@ -2527,9 +2589,9 @@ namespace CLEO {
 	//0AD1=-1,show_formatted_text_highpriority %1d% time %2d%
 	OpcodeResult __stdcall opcode_0AD1(CRunningScript *thread)
 	{
-		auto format = ReadStringParam(thread);
+		auto format = ReadStringParam(thread); OPCODE_VALIDATE_STR_ARG_READ(format)
 		DWORD time; *thread >> time;
-		char text[MAX_STR_LEN]; ReadFormattedString(thread, text, sizeof(text), format);
+		char text[MAX_STR_LEN]; OPCODE_READ_FORMATTED_STRING(thread, text, sizeof(text), format)
 
 		PrintNow(text, time);
 		return OR_CONTINUE;
@@ -2559,10 +2621,9 @@ namespace CLEO {
 	//0AD3=-1,string %1d% format %2d% ...
 	OpcodeResult __stdcall opcode_0AD3(CRunningScript *thread)
 	{
-		auto resultArg = GetStringParamWriteBuffer(thread);
-
-		auto format = ReadStringParam(thread);
-		char text[MAX_STR_LEN]; ReadFormattedString(thread, text, sizeof(text), format);
+		auto resultArg = GetStringParamWriteBuffer(thread); OPCODE_VALIDATE_STR_ARG_WRITE(resultArg.first)
+		auto format = ReadStringParam(thread); OPCODE_VALIDATE_STR_ARG_READ(format)
+		char text[MAX_STR_LEN]; OPCODE_READ_FORMATTED_STRING(thread, text, sizeof(text), format)
 
 		if (resultArg.first != nullptr && resultArg.second > 0)
 		{
@@ -2579,9 +2640,9 @@ namespace CLEO {
 	//0AD4=-1,%3d% = scan_string %1d% format %2d%  //IF and SET
 	OpcodeResult __stdcall opcode_0AD4(CRunningScript *thread)
 	{
-		char fmt[MAX_STR_LEN], *format, *src;
-		src = ReadStringParam(thread);
-		format = ReadStringParam(thread, fmt, sizeof(fmt));
+		auto src = ReadStringParam(thread); OPCODE_VALIDATE_STR_ARG_READ(src)
+		char fmt[MAX_STR_LEN];
+		auto format = ReadStringParam(thread, fmt, sizeof(fmt)); OPCODE_VALIDATE_STR_ARG_READ(format)
 
 		size_t cExParams = 0;
 		int *result = (int *)GetScriptParamPointer(thread);
@@ -2652,14 +2713,16 @@ namespace CLEO {
 	//0AD8=2,write_string_to_file %1d% from %2d% //IF and SET
 	OpcodeResult __stdcall opcode_0AD8(CRunningScript *thread)
 	{
-		DWORD hFile;
-		*thread >> hFile;
+		DWORD hFile; *thread >> hFile;
+		auto text = ReadStringParam(thread); OPCODE_VALIDATE_STR_ARG_READ(text)
+
 		if (FILE * file = convert_handle_to_file(hFile))
 		{
-			SetScriptCondResult(thread, fputs(ReadStringParam(thread), file) > 0);
+			SetScriptCondResult(thread, fputs(text, file) > 0);
 			fflush(file);
 		}
-		else {
+		else 
+		{
 			SetScriptCondResult(thread, false);
 		}
 		return OR_CONTINUE;
@@ -2669,8 +2732,8 @@ namespace CLEO {
 	OpcodeResult __stdcall opcode_0AD9(CRunningScript *thread)
 	{
 		DWORD hFile; *thread >> hFile;
-		auto format = ReadStringParam(thread);
-		char text[MAX_STR_LEN]; ReadFormattedString(thread, text, sizeof(text), format);
+		auto format = ReadStringParam(thread); OPCODE_VALIDATE_STR_ARG_READ(format)
+		char text[MAX_STR_LEN]; OPCODE_READ_FORMATTED_STRING(thread, text, sizeof(text), format)
 		
 		if (FILE * file = convert_handle_to_file(hFile))
 		{
@@ -2684,9 +2747,8 @@ namespace CLEO {
 	OpcodeResult __stdcall opcode_0ADA(CRunningScript *thread)
 	{
 		DWORD hFile; *thread >> hFile;
-		auto format = ReadStringParam(thread);
+		auto format = ReadStringParam(thread); OPCODE_VALIDATE_STR_ARG_READ(format)
 		int *result = (int *)GetScriptParamPointer(thread);
-
 
 		size_t cExParams = 0;
 		SCRIPT_VAR *ExParams[35];
@@ -2733,7 +2795,8 @@ namespace CLEO {
 	//0ADC=1, test_cheat %1d%
 	OpcodeResult __stdcall opcode_0ADC(CRunningScript *thread)
 	{
-		SetScriptCondResult(thread, TestCheat(ReadStringParam(thread)));
+		auto text = ReadStringParam(thread); OPCODE_VALIDATE_STR_ARG_READ(text)
+		SetScriptCondResult(thread, TestCheat(text));
 		return OR_CONTINUE;
 	}
 
@@ -2758,11 +2821,15 @@ namespace CLEO {
 	//0ADE=2,%2d% = text_by_GXT_entry %1d%
 	OpcodeResult __stdcall opcode_0ADE(CRunningScript *thread)
 	{
-		const char *gxt = ReadStringParam(thread);
+		auto gxt = ReadStringParam(thread); OPCODE_VALIDATE_STR_ARG_READ(gxt)
+
 		if (*thread->GetBytePointer() >= 1 && *thread->GetBytePointer() <= 8)
 			*thread << GetInstance().TextManager.Get(gxt);
 		else
-			strcpy((char *)GetScriptParamPointer(thread), GetInstance().TextManager.Get(gxt));
+		{
+			auto ok = WriteStringParam(thread, GetInstance().TextManager.Get(gxt)); OPCODE_VALIDATE_STR_ARG_WRITE(ok)
+		}
+
 		return OR_CONTINUE;
 	}
 
@@ -2770,9 +2837,8 @@ namespace CLEO {
 	OpcodeResult __stdcall opcode_0ADF(CRunningScript *thread)
 	{
 		char gxtLabel[8]; // 7 + terminator character
-		ReadStringParam(thread, gxtLabel, sizeof(gxtLabel));
-
-		char *text = ReadStringParam(thread);
+		auto gxtOk = ReadStringParam(thread, gxtLabel, sizeof(gxtLabel)); OPCODE_VALIDATE_STR_ARG_READ(gxtOk)
+		auto text = ReadStringParam(thread); OPCODE_VALIDATE_STR_ARG_READ(text)
 
 		GetInstance().TextManager.AddFxt(gxtLabel, text);
 		return OR_CONTINUE;
@@ -2781,7 +2847,9 @@ namespace CLEO {
 	//0AE0=1,remove_dynamic_GXT_entry %1d%
 	OpcodeResult __stdcall opcode_0AE0(CRunningScript *thread)
 	{
-		GetInstance().TextManager.RemoveFxt(ReadStringParam(thread));
+		auto gxt = ReadStringParam(thread); OPCODE_VALIDATE_STR_ARG_READ(gxt)
+
+		GetInstance().TextManager.RemoveFxt(gxt);
 		return OR_CONTINUE;
 	}
 
@@ -2949,15 +3017,11 @@ namespace CLEO {
 	OpcodeResult __stdcall opcode_0AED(CRunningScript *thread)
 	{
 		// this opcode is useless now
-		float val;
-		char *format, *result;
-		*thread >> val;
-		format = ReadStringParam(thread);
-		if (*thread->GetBytePointer() >= 1 && *thread->GetBytePointer() <= 8)
-			*thread >> result;
-		else
-			result = &GetScriptParamPointer(thread)->cParam;
-		sprintf(result, format, val);
+		float val; *thread >> val;
+		auto format = ReadStringParam(thread); OPCODE_VALIDATE_STR_ARG_READ(format)
+		auto resultArg = GetStringParamWriteBuffer(thread); OPCODE_VALIDATE_STR_ARG_WRITE(resultArg.first)
+
+		sprintf(resultArg.first, format, val);
 		return OR_CONTINUE;
 	}
 
@@ -2989,9 +3053,9 @@ namespace CLEO {
 	//2000=2,%2s% = resolve_filepath %1s%
 	OpcodeResult __stdcall opcode_2000(CRunningScript* thread)
 	{
-		auto path = CLEO_ReadStringOpcodeParam(thread);
-		CLEO_ResolvePath(thread, path, MAX_STR_LEN);
-		CLEO_WriteStringOpcodeParam(thread, path);
+		auto path = ReadStringParam(thread); OPCODE_VALIDATE_STR_ARG_READ(path)
+		auto resolved = reinterpret_cast<CCustomScript*>(thread)->ResolvePath(path);
+		auto ok = WriteStringParam(thread, resolved.c_str()); OPCODE_VALIDATE_STR_ARG_WRITE(ok)
 		return OR_CONTINUE;
 	}
 
@@ -3031,10 +3095,12 @@ namespace CLEO {
 			path.append(script->GetScriptFileName());
 			path = script->ResolvePath(path.c_str()); // real absolute path
 
-			CLEO_WriteStringOpcodeParam(thread, path.c_str());
+			auto ok = WriteStringParam(thread, path.c_str()); OPCODE_VALIDATE_STR_ARG_WRITE(ok)
 		}
 		else
-			CLEO_WriteStringOpcodeParam(thread, script->GetScriptFileName());
+		{
+			auto ok = WriteStringParam(thread, script->GetScriptFileName()); OPCODE_VALIDATE_STR_ARG_WRITE(ok)
+		}
 
 		SetScriptCondResult(thread, true);
 		return OR_CONTINUE;
@@ -3094,12 +3160,18 @@ extern "C"
 
 	LPSTR WINAPI CLEO_ReadStringPointerOpcodeParam(CLEO::CRunningScript* thread, char *buf, int size)
 	{
-		return ReadStringParam(thread, buf, size);
+		auto result = ReadStringParam(thread, buf, size);
+
+		if (result == nullptr)
+			LOG_WARNING("%s in script %s", lastErrorMsg.c_str(), ((CCustomScript*)thread)->GetInfoStr().c_str());
+
+		return result;
 	}
 
 	void WINAPI CLEO_WriteStringOpcodeParam(CLEO::CRunningScript* thread, const char* str)
 	{
-		WriteStringParam(thread, str);
+		if(!WriteStringParam(thread, str))
+			LOG_WARNING("%s in script %s", lastErrorMsg.c_str(), ((CCustomScript*)thread)->GetInfoStr().c_str());
 	}
 
 	char* WINAPI CLEO_ReadParamsFormatted(CLEO::CRunningScript* thread, const char* format, char* buf, int bufSize)
@@ -3108,12 +3180,10 @@ extern "C"
 		if (!buf) { buf = internal_buf; bufSize = sizeof(internal_buf); }
 		if (!bufSize) bufSize = MAX_STR_LEN;
 
-		if(format != nullptr && strlen(format) > 0)
-			ReadFormattedString(thread, buf, bufSize, format);
-		else
+		if(ReadFormattedString(thread, buf, bufSize, format) == -1) // error?
 		{
-			SkipUnusedVarArgs(thread);
-			if(bufSize > 0) buf[0] = '\0';
+			LOG_WARNING("%s in script %s", lastErrorMsg.c_str(), ((CCustomScript*)thread)->GetInfoStr().c_str());
+			return nullptr; // error
 		}
 
 		return buf;
