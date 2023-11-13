@@ -126,6 +126,8 @@ namespace CLEO
 	OpcodeResult __stdcall opcode_0DD5(CRunningScript* thread); // get_platform
 	OpcodeResult __stdcall opcode_2000(CRunningScript* thread); // resolve_filepath
 	OpcodeResult __stdcall opcode_2001(CRunningScript* thread); // get_script_filename
+	OpcodeResult __stdcall opcode_2002(CRunningScript* thread); // cleo_return_with
+	OpcodeResult __stdcall opcode_2003(CRunningScript* thread); // cleo_return_false
 
 	typedef void(*FuncScriptDeleteDelegateT) (CRunningScript *script);
 	struct ScriptDeleteDelegate {
@@ -400,6 +402,8 @@ namespace CLEO
 		CLEO_RegisterOpcode(0x0DD5, opcode_0DD5); // get_platform
 		CLEO_RegisterOpcode(0x2000, opcode_2000); // resolve_filepath
 		CLEO_RegisterOpcode(0x2001, opcode_2001); // get_script_filename
+		CLEO_RegisterOpcode(0x2002, opcode_2002); // cleo_return_with
+		CLEO_RegisterOpcode(0x2002, opcode_2003); // cleo_return_false
 	}
 
 	void CCustomOpcodeSystem::Inject(CCodeInjector& inj)
@@ -3218,6 +3222,49 @@ namespace CLEO
 		}
 
 		SetScriptCondResult(thread, true);
+		return OR_CONTINUE;
+	}
+
+	//2002=-1, cleo_return_with ...
+	OpcodeResult __stdcall opcode_2002(CRunningScript* thread)
+	{
+		auto cs = reinterpret_cast<CCustomScript*>(thread);
+		DWORD returnParamCount = GetVarArgCount(cs);
+
+		if (returnParamCount) GetScriptParams(cs, returnParamCount);
+
+		ScmFunction* scmFunc = ScmFunction::Store[cs->GetScmFunction()];
+		scmFunc->Return(cs); // jump back to cleo_call, right after last input param. Return slot var args starts here
+		if (scmFunc->moduleExportRef != nullptr) GetInstance().ModuleSystem.ReleaseModuleRef((char*)scmFunc->moduleExportRef); // exiting export - release module
+		delete scmFunc;
+
+		DWORD returnSlotCount = GetVarArgCount(cs);
+		if(returnParamCount != returnSlotCount) // new CLEO5 opcode, strict error checks
+		{
+			SHOW_ERROR("Opcode [2002] returned %d params, while function caller expected %d in script %s\nScript suspended.", returnParamCount, returnSlotCount,  cs->GetInfoStr().c_str());
+			return CCustomOpcodeSystem::ErrorSuspendScript(cs);
+		}
+
+		if (returnSlotCount) SetScriptParams(cs, returnSlotCount);
+		cs->IncPtr(); // skip var args
+
+		SetScriptCondResult(cs, true);
+		return OR_CONTINUE;
+	}
+
+	//2003=0, cleo_return_false
+	OpcodeResult __stdcall opcode_2003(CRunningScript* thread)
+	{
+		auto cs = reinterpret_cast<CCustomScript*>(thread);
+
+		ScmFunction* scmFunc = ScmFunction::Store[cs->GetScmFunction()];
+		scmFunc->Return(cs); // jump back to cleo_call, right after last input param. Return slot var args starts here
+		if (scmFunc->moduleExportRef != nullptr) GetInstance().ModuleSystem.ReleaseModuleRef((char*)scmFunc->moduleExportRef); // exiting export - release module
+		delete scmFunc;
+
+		SkipUnusedVarArgs(thread); // just exit without change of return params
+
+		SetScriptCondResult(cs, false);
 		return OR_CONTINUE;
 	}
 }
