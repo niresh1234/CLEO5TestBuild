@@ -84,6 +84,11 @@ private:
                             this->msg.push_back(c);
                     }
                 }
+
+                if(!this->msg.empty() && this->msg.back() == ' ') // a bug(?) in game prevents drawing texts ending with whitespace
+                {
+                    this->msg.back() = '_'; // '_' is drawn as empty character too
+                }
             }
 
             ResetTime();
@@ -101,7 +106,7 @@ private:
 
         void ResetTime()
         {
-            timeLeft = min(msg.length(), 200) * 0.08f; // 12 letters peer second reading speed
+            timeLeft = min(msg.length(), 200) * 0.06f; // 16 letters peer second reading speed
             timeLeft = max(timeLeft, 0.001f * ScreenLog::timeDisplay); // not shorter than defined in config
         }
 
