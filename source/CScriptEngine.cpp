@@ -1301,128 +1301,144 @@ namespace CLEO
         });
     }
 
-	// TODO: Consider split into 2 classes: CCustomExternalScript, CCustomChildScript
+    // TODO: Consider split into 2 classes: CCustomExternalScript, CCustomChildScript
     CCustomScript::CCustomScript(const char *szFileName, bool bIsMiss, CRunningScript *parent, int label)
         : CRunningScript(), bSaveEnabled(false), bOK(false),
         LastSearchPed(0), LastSearchCar(0), LastSearchObj(0),
         CompatVer(CLEO_VER_CUR)
     {
+        TRACE("Loading custom script %s...", szFileName);
+
         bIsCustom = true;
         bIsMission = bUseMissionCleanup = bIsMiss;
         UseTextCommands = 0;
         NumDraws = 0;
         NumTexts = 0;
 
-        TRACE("Loading custom script %s...", szFileName);
-
-        // store script file directory and name
-        FS::path path = szFileName;
-        path = FS::weakly_canonical(path);
-
-        // file exists?
-        if (!FS::is_regular_file(path))
-        {
-            if(path.extension() == cs_ext)
-            {
-                // maybe it was renamed to enable compatibility mode?
-                auto compatPath = path;
-
-                compatPath.replace_extension(cs4_ext);
-                if(FS::is_regular_file(compatPath))
-                {
-                    path = compatPath;
-                }
-                else
-                {
-                    compatPath.replace_extension(cs3_ext);
-                    if (FS::is_regular_file(compatPath))
-                    {
-                        path = compatPath;
-                    }
-                    else
-                    {
-                        throw std::logic_error("File does not exists");
-                    }
-                }
-            }
-            else
-                throw std::logic_error("File does not exists");
-        }
-
-        // deduce compatibility mode from filetype extension
-        if (path.extension() == cs4_ext)
-            CompatVer = CLEO_VER_4;
-        else
-        if (path.extension() == cs3_ext)
-            CompatVer = CLEO_VER_3;
-
-        if(CompatVer == CLEO_VER_CUR && parent != nullptr && parent-IsCustom())
-        {
-            // inherit compatibility mode from parent
-            CompatVer = ((CCustomScript*)parent)->GetCompatibility(); 
-            
-            // try loading file with same compatibility mode filetype extension
-            auto compatPath = path;
-            if(CompatVer == CLEO_VER_4)
-            {
-                compatPath.replace_extension(cs4_ext);
-                if(FS::is_regular_file(compatPath))
-                    path = compatPath;
-            }
-            else
-            if (CompatVer == CLEO_VER_3)
-            {
-                compatPath.replace_extension(cs3_ext);
-                if (FS::is_regular_file(compatPath))
-                    path = compatPath;
-            }
-        }
-
-        scriptFileDir = path.parent_path().string();
-        scriptFileName = path.filename().string();
-        workDir = Filepath_Root; // game root
-
         try
         {
-			std::ifstream is;
-			if (label != 0) // Create external from label.
-			{
-				if (!parent)
-					throw std::logic_error("Trying to create external thread from label without parent thread");
+            std::ifstream is;
+            if (label != 0) // Create external from label.
+            {
+                if (!parent)
+                    throw std::logic_error("Trying to create external thread from label without parent thread");
 
                 if (!parent->IsCustom())
                     throw std::logic_error("Only custom threads can spawn children threads from label");
 
                 auto cs = (CCustomScript*)parent;
 
-				BaseIP = cs->GetBasePointer();
-				CurrentIP = cs->GetBasePointer() - label;
-				memcpy(Name, cs->Name, sizeof(Name));
-				dwChecksum = cs->dwChecksum;
-				parentThread = cs;
-                cs->childThreads.push_back(this);
-			}
-			else
-			{
-				using std::ios;
-				std::ifstream is(path.string().c_str(), std::ios::binary);
-				is.exceptions(std::ios::badbit | std::ios::failbit);
-				std::size_t length;
-				is.seekg(0, std::ios::end);
-				length = (size_t)is.tellg();
-				is.seekg(0, std::ios::beg);
+                CompatVer = cs->GetCompatibility();
+                bDebugMode = cs->GetDebugMode();
+                scriptFileDir = cs->GetScriptFileDir();
+                scriptFileName = cs->GetScriptFileName();
+                workDir = cs->GetWorkDir();
 
-				if (bIsMiss)
-				{
-					if (*MissionLoaded)
-						throw std::logic_error("Starting of custom mission when other mission loaded");
-					*MissionLoaded = 1;
-					BaseIP = CurrentIP = missionBlock;
-				}
-				else {
-					BaseIP = CurrentIP = new BYTE[length];
-				}
-				is.read(reinterpret_cast<char *>(BaseIP), length);
+                BaseIP = cs->GetBasePointer();
+                CurrentIP = cs->GetBasePointer() - label;
+                memcpy(Name, cs->Name, sizeof(Name));
+                dwChecksum = cs->dwChecksum;
+                parentThread = cs;
+                cs->childThreads.push_back(this);
+            }
+            else
+            {
+                // store script file directory and name
+                FS::path path = szFileName;
+                path = FS::weakly_canonical(path);
+
+                // file exists?
+                if (!FS::is_regular_file(path))
+                {
+                    if (path.extension() == cs_ext)
+                    {
+                        // maybe it was renamed to enable compatibility mode?
+                        auto compatPath = path;
+
+                        compatPath.replace_extension(cs4_ext);
+                        if (FS::is_regular_file(compatPath))
+                        {
+                            path = compatPath;
+                        }
+                        else
+                        {
+                            compatPath.replace_extension(cs3_ext);
+                            if (FS::is_regular_file(compatPath))
+                            {
+                                path = compatPath;
+                            }
+                            else
+                            {
+                                throw std::logic_error("File does not exists");
+                            }
+                        }
+                    }
+                    else
+                        throw std::logic_error("File does not exists");
+                }
+
+                // deduce compatibility mode from filetype extension
+                if (path.extension() == cs4_ext)
+                    CompatVer = CLEO_VER_4;
+                else
+                    if (path.extension() == cs3_ext)
+                        CompatVer = CLEO_VER_3;
+
+                if (CompatVer == CLEO_VER_CUR && parent != nullptr && parent - IsCustom())
+                {
+                    // inherit compatibility mode from parent
+                    CompatVer = ((CCustomScript*)parent)->GetCompatibility();
+
+                    // try loading file with same compatibility mode filetype extension
+                    auto compatPath = path;
+                    if (CompatVer == CLEO_VER_4)
+                    {
+                        compatPath.replace_extension(cs4_ext);
+                        if (FS::is_regular_file(compatPath))
+                            path = compatPath;
+                    }
+                    else
+                        if (CompatVer == CLEO_VER_3)
+                        {
+                            compatPath.replace_extension(cs3_ext);
+                            if (FS::is_regular_file(compatPath))
+                                path = compatPath;
+                        }
+                }
+
+                scriptFileDir = path.parent_path().string();
+                scriptFileName = path.filename().string();
+
+                if(parent != nullptr)
+                {
+                    bDebugMode = ((CCustomScript*)parent)->GetDebugMode();
+                    workDir = ((CCustomScript*)parent)->GetWorkDir();
+                }
+                else
+                {
+                    bDebugMode = GetInstance().ScriptEngine.NativeScriptsDebugMode; // global setting
+                    workDir = Filepath_Root; // game root
+                }
+
+                using std::ios;
+                std::ifstream is(path.string().c_str(), std::ios::binary);
+                is.exceptions(std::ios::badbit | std::ios::failbit);
+                std::size_t length;
+                is.seekg(0, std::ios::end);
+                length = (size_t)is.tellg();
+                is.seekg(0, std::ios::beg);
+
+                if (bIsMiss)
+                {
+                    if (*MissionLoaded)
+                        throw std::logic_error("Starting of custom mission when other mission loaded");
+                    *MissionLoaded = 1;
+                    BaseIP = CurrentIP = missionBlock;
+                }
+                else {
+                    BaseIP = CurrentIP = new BYTE[length];
+                }
+                is.read(reinterpret_cast<char *>(BaseIP), length);
 
                 dwChecksum = crc32(reinterpret_cast<BYTE*>(BaseIP), length);
 
@@ -1440,26 +1456,26 @@ namespace CLEO
                     auto len = min(fName.length(), sizeof(Name) - 1); // and text terminator
                     memcpy(Name, fName.c_str(), len);
                 }
-			}
-			lastScriptCreated = this;
+            }
+            lastScriptCreated = this;
             bOK = true;
         }
         catch (std::exception& e)
         {
-            LOG_WARNING(0, "Error during loading of custom script %s occured.\nError message: %s", path.string().c_str(), e.what());
+            LOG_WARNING(0, "Error during loading of custom script %s occured.\nError message: %s", szFileName, e.what());
         }
         catch (...)
         {
-            LOG_WARNING(0, "Unknown error during loading of custom script %s occured.", path.string().c_str());
+            LOG_WARNING(0, "Unknown error during loading of custom script %s occured.", szFileName);
         }
     }
 
     CCustomScript::~CCustomScript()
     {
         if (BaseIP && !bIsMission) delete[] BaseIP;
-		RunScriptDeleteDelegate(reinterpret_cast<CRunningScript*>(this));
-		if (lastScriptCreated == this) lastScriptCreated = nullptr;
+        RunScriptDeleteDelegate(reinterpret_cast<CRunningScript*>(this));
+        if (lastScriptCreated == this) lastScriptCreated = nullptr;
     }
 
-	float VectorSqrMagnitude(CVector vector) { return vector.x * vector.x + vector.y * vector.y + vector.z * vector.z; }
+    float VectorSqrMagnitude(CVector vector) { return vector.x * vector.x + vector.y * vector.y + vector.z * vector.z; }
 }
