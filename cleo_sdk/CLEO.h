@@ -269,6 +269,14 @@ enum class eLogLevel : DWORD
 	Default // all log messages
 };
 
+enum OpcodeResult : char
+{
+	OR_NONE = -2,
+	OR_ERROR = -1,
+	OR_CONTINUE = 0,
+	OR_INTERRUPT = 1,
+};
+
 typedef int SCRIPT_HANDLE;
 typedef SCRIPT_HANDLE HANDLE_ACTOR, ACTOR, HACTOR, PED, HPED, HANDLE_PED;
 typedef SCRIPT_HANDLE HANDLE_CAR, CAR, HCAR, VEHICLE, HVEHICLE, HANDLE_VEHICLE;
@@ -354,6 +362,7 @@ public:
 	CRunningScript* GetPrev() const { return Previous; }
 	void SetIsExternal(bool b) { bIsExternal = b; }
 	void SetActive(bool b) { bIsActive = b; }
+	OpcodeResult Suspend() { WakeTime = 0xFFFFFFFF; return OpcodeResult::OR_INTERRUPT; } // suspend script execution forever
 	void SetNext(CRunningScript* v) { Next = v; }
 	void SetPrev(CRunningScript* v) { Previous = v; }
 	SCRIPT_VAR* GetVarPtr() { return LocalVar; }
@@ -398,14 +407,6 @@ static_assert(sizeof(CRunningScript) == 0xE0, "Invalid size of CRunningScript!")
 	typedef struct CRunningScript CScriptThread;
 #endif
 
-enum OpcodeResult : char
-{
-	OR_NONE = -2,
-	OR_ERROR = -1,
-	OR_CONTINUE = 0,
-	OR_INTERRUPT = 1,
-};
-
 typedef OpcodeResult (CALLBACK* _pOpcodeHandler)(CRunningScript*);
 typedef void(*FuncScriptDeleteDelegateT) (CRunningScript*);
 
@@ -440,6 +441,7 @@ DWORD WINAPI CLEO_GetIntOpcodeParam(CRunningScript* thread);
 float WINAPI CLEO_GetFloatOpcodeParam(CRunningScript* thread);
 LPSTR WINAPI CLEO_ReadStringOpcodeParam(CRunningScript* thread, char* buf = nullptr, int bufSize = 0);
 LPSTR WINAPI CLEO_ReadStringPointerOpcodeParam(CRunningScript* thread, char* buf = nullptr, int bufSize = 0); // exactly same as CLEO_ReadStringOpcodeParam
+void WINAPI CLEO_ReadStringParamWriteBuffer(CRunningScript* thread, char** outBuf, int* outBufSize, DWORD* outNeedsTerminator); // get info about the string opcode param, so it can be written latter. If outNeedsTerminator is not 0 then whole bufSize can be used as text characters. Advances script to next param
 char* WINAPI CLEO_ReadParamsFormatted(CRunningScript* thread, const char* format, char* buf = nullptr, int bufSize = 0); // consumes all var-arg params and terminator
 
 // param skip without reading

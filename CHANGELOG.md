@@ -9,18 +9,23 @@
   - new opcode **2102 ([log_to_file](https://library.sannybuilder.com/#/sa/debug/2102))**
   - implemented support of opcodes **0662**, **0663** and **0664** (original Rockstar's script debugging opcodes. See DebugUtils.ini)
 - new and updated opcodes
+  - **0B1E ([sign_extend](https://library.sannybuilder.com/#/sa/bitwise/0B1E))**
   - **0DD5 ([get_game_platform](https://library.sannybuilder.com/#/sa/CLEO/0DD5))**
   - **2000 ([resolve_filepath](https://library.sannybuilder.com/#/sa/CLEO/2000))**
   - **2001 ([get_script_filename](https://library.sannybuilder.com/#/sa/CLEO/2001))**
   - **2002 ([cleo_return_with](https://library.sannybuilder.com/#/sa/CLEO/2002))**
   - **2003 ([cleo_return_fail](https://library.sannybuilder.com/#/sa/CLEO/2003))**
   - **2004 ([forget_memory](https://library.sannybuilder.com/#/sa/CLEO/2004))**
+  - **2300 ([get_file_position](https://library.sannybuilder.com/#/sa/file/2300))**
+  - **2301 ([read_block_from_file](https://library.sannybuilder.com/#/sa/file/2301))**
+  - opcodes **0A9A**, **0A9B**, **0A9C**, **0A9D**, **0A9E**, **0AAB**, **0AD5**, **0AD6**, **0AD7**, **0AD8**, **0AD9**, **0ADA**, **0AE4**, **0AE5**, **0AE6**, **0AE7**  and **0AE8** moved to the [FileSystemOperations](https://github.com/cleolibrary/CLEO5/tree/master/cleo_plugins/FileSystemOperations) plugin
+  - fixed bug preventing file stream opcodes from working correctly for read-write modes
+  - fixed buffer overflows in file stream read opcodes
+  - added/fixed support of all file stream opcodes in legacy mode (Cleo3)
   - 'argument count' parameter of **0AB1 (cleo_call)** is now optional. `cleo_call @LABEL args 0` can be written as `cleo_call @LABEL`
   - 'argument count' parameter of **0AB2 (cleo_return)** is now optional. `cleo_return 0` can be written as `cleo_return`
-  - opcodes **0AAB**, **0AE4**, **0AE5**, **0AE6**, **0AE7** and **0AE8** moved to the [FileSystemOperations](https://github.com/cleolibrary/CLEO5/tree/master/cleo_plugins/FileSystemOperations) plugin
   - **cleo_return_\*** opcodes now can pass strings as return arguments
   - SCM functions **(0AB1)** now keep their own GOSUB's call stack
-  - new opcode **0B1E ([sign_extend](https://library.sannybuilder.com/#/sa/bitwise/0B1E))**
 - changes in file operations
   - file paths can now use 'virtual absolute paths'. Use prefix in file path strings to access predefined locations: 
     - `root:\` for _game root_ directory
@@ -49,6 +54,7 @@
 - new SDK method: CLEO_GetVarArgCount
 - new SDK method: CLEO_SkipUnusedVarArgs
 - new SDK method: CLEO_ReadParamsFormatted
+- new SDK method: CLEO_ReadStringParamWriteBuffer
 - new SDK method: CLEO_GetScriptVersion
 - new SDK method: CLEO_GetScriptInfoStr
 - new SDK method: CLEO_ResolvePath

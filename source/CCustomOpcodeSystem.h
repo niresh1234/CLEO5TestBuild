@@ -8,8 +8,6 @@
 namespace CLEO
 {
     typedef OpcodeResult(__stdcall * CustomOpcodeHandler)(CRunningScript*);
-    bool is_legacy_handle(DWORD dwHandle);
-    FILE * convert_handle_to_file(DWORD dwHandle);
 
     extern const char* (__cdecl* GetUserDirectory)();
     extern void(__cdecl* ChangeToUserDir)();
@@ -45,18 +43,14 @@ namespace CLEO
 
         static OpcodeResult CallFunctionGeneric(WORD opcode, CRunningScript* thread, bool thisCall, bool returnArg);
         static OpcodeResult CleoReturnGeneric(WORD opcode, CRunningScript* thread, bool returnArgs = false, DWORD returnArgCount = 0, bool strictArgCount = true);
-        static OpcodeResult ErrorSuspendScript(CRunningScript* thread); // suspend script execution forever
 
     private:
-        friend OpcodeResult __stdcall opcode_0A9A(CRunningScript *pScript);
-        friend OpcodeResult __stdcall opcode_0A9B(CRunningScript *pScript);
         friend OpcodeResult __stdcall opcode_0AA2(CRunningScript *pScript);
         friend OpcodeResult __stdcall opcode_0AA3(CRunningScript *pScript);
         friend OpcodeResult __stdcall opcode_0AC8(CRunningScript *pScript);
         friend OpcodeResult __stdcall opcode_0AC9(CRunningScript *pScript);
         friend OpcodeResult __stdcall opcode_2004(CRunningScript* pScript);
 
-        std::set<DWORD> m_hFiles;
         std::set<HMODULE> m_hNativeLibs;
         std::set<void*> m_pAllocations;
 
