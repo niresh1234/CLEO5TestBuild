@@ -68,8 +68,20 @@ enum eDataType : BYTE
 	DT_VAR_STRING, // globalVarVString v$
 	DT_LVAR_STRING, // localVarVString @v
 	DT_VAR_STRING_ARRAY, // globalVarStringArr v$(,)
-	DT_LVAR_STRING_ARRAY // localVarStringArr @v(,)
+	DT_LVAR_STRING_ARRAY, // localVarStringArr @v(,)
+	DT_INVALID = 0xFF // CLEO internal
 };
+
+enum eArrayDataType : BYTE
+{
+	ADT_INT, // variable with integer
+	ADT_FLOAT, // variable with integer
+	ADT_TEXTLABEL, // variable with short string (8 char)
+	ADT_STRING, // variable with long string (16 char)
+	ADT_NONE = 0xFF // CLEO internal
+};
+static const BYTE ArrayDataTypeMask = ADT_INT | ADT_FLOAT | ADT_TEXTLABEL | ADT_STRING; // array flags byte contains other info too. Type needs to be masked when read
+
 static const char* ToStr(eDataType type)
 {
 	switch (type)
@@ -151,7 +163,21 @@ static bool IsVariable(eDataType type) // can carry int, float, pointer to text
 	}
 	return false;
 }
-static const char* ToKindStr(eDataType type)
+static bool IsArray(eDataType type)
+{
+	switch (type)
+	{
+		case DT_LVAR_TEXTLABEL_ARRAY:
+		case DT_LVAR_STRING_ARRAY:
+		case DT_VAR_TEXTLABEL_ARRAY:
+		case DT_VAR_STRING_ARRAY:
+		case DT_VAR_ARRAY:
+		case DT_LVAR_ARRAY:
+			return true;
+	}
+	return false;
+}
+static const char* ToKindStr(eDataType type, eArrayDataType arrType = ADT_NONE)
 {
 	switch (type)
 	{
@@ -177,10 +203,25 @@ static const char* ToKindStr(eDataType type)
 			return "string"; break;
 
 		case DT_VAR:
-		case DT_VAR_ARRAY:
 		case DT_LVAR:
-		case DT_LVAR_ARRAY:
 			return "variable"; break;
+
+		case DT_VAR_ARRAY:
+		case DT_LVAR_ARRAY:
+			switch(arrType)
+			{
+				case ADT_INT:
+					return "int"; break;
+
+				case ADT_FLOAT:
+					return "float"; break;
+
+				case ADT_TEXTLABEL:
+				case ADT_STRING:
+					return "string"; break;
+
+				default: return "variable";
+			}
 
 		case DT_END:
 			return "varArgEnd"; break;
@@ -287,7 +328,7 @@ typedef SCRIPT_HANDLE HSTREAM;
 #ifdef __cplusplus
 class CRunningScript
 {
-protected:
+public:
 #else
 struct CRunningScript
 {
@@ -377,6 +418,8 @@ public:
 	void SetNotFlag(bool state) { NotFlag = state; }
 
 	eDataType PeekDataType() const { return *(eDataType*)CurrentIP; }
+	eArrayDataType PeekArrayDataType() const { BYTE t = *(CurrentIP + 1 + 2 + 2 + 1); t &= ArrayDataTypeMask; return (eArrayDataType) t; } // result valid only for array type params
+
 	eDataType ReadDataType() { return (eDataType)ReadDataByte(); }
 	short ReadDataVarIndex() { return ReadDataWord(); }
 	short ReadDataArrayOffset() { return ReadDataWord(); }
@@ -424,6 +467,10 @@ void WINAPI CLEO_RegisterCallback(eCallbackId id, void* func);
 // script utils
 void WINAPI CLEO_GetScriptInfoStr(CRunningScript* thread, bool currLineInfo, char* buf, DWORD bufSize); // short text for displaying in error\log messages
 eCLEO_Version WINAPI CLEO_GetScriptVersion(const CRunningScript* thread); // compatibility mode
+LPCSTR WINAPI CLEO_GetScriptFilename(const CRunningScript* thread); // returns nullptr if provided script ptr is not valid
+
+LPCSTR WINAPI CLEO_GetScriptWorkDir(const CRunningScript* thread);
+void WINAPI CLEO_SetScriptWorkDir(CRunningScript* thread, const char* path);
 
 void WINAPI CLEO_SetThreadCondResult(CRunningScript* thread, BOOL result);
 void WINAPI CLEO_ThreadJumpAtLabelPtr(CRunningScript* thread, int labelPtr);
@@ -434,15 +481,21 @@ DWORD WINAPI CLEO_GetVarArgCount(CRunningScript* thread); // peek remaining var-
 extern SCRIPT_VAR* opcodeParams;
 extern SCRIPT_VAR* missionLocals;
 
+SCRIPT_VAR* WINAPI CLEO_GetOpcodeParamsArray(); // get pointer to 'SCRIPT_VAR[32] opcodeParams'. Used by Retrieve/Record opcode params functions
+BYTE WINAPI CLEO_GetParamsHandledCount(); // number of already read/written opcode parameters since current opcode handler was called
+
 // param read
 SCRIPT_VAR* WINAPI CLEO_GetPointerToScriptVariable(CRunningScript* thread); // get pointer to the variable data. Advances script to next param
 void WINAPI CLEO_RetrieveOpcodeParams(CRunningScript* thread, int count); // read multiple params. Stored in opcodeParams array
 DWORD WINAPI CLEO_GetIntOpcodeParam(CRunningScript* thread);
 float WINAPI CLEO_GetFloatOpcodeParam(CRunningScript* thread);
-LPSTR WINAPI CLEO_ReadStringOpcodeParam(CRunningScript* thread, char* buf = nullptr, int bufSize = 0);
+LPSTR WINAPI CLEO_ReadStringOpcodeParam(CRunningScript* thread, char* buf = nullptr, int bufSize = 0); // returns nullptr on fail
 LPSTR WINAPI CLEO_ReadStringPointerOpcodeParam(CRunningScript* thread, char* buf = nullptr, int bufSize = 0); // exactly same as CLEO_ReadStringOpcodeParam
 void WINAPI CLEO_ReadStringParamWriteBuffer(CRunningScript* thread, char** outBuf, int* outBufSize, DWORD* outNeedsTerminator); // get info about the string opcode param, so it can be written latter. If outNeedsTerminator is not 0 then whole bufSize can be used as text characters. Advances script to next param
 char* WINAPI CLEO_ReadParamsFormatted(CRunningScript* thread, const char* format, char* buf = nullptr, int bufSize = 0); // consumes all var-arg params and terminator
+// get param value without advancing the script
+DWORD WINAPI CLEO_PeekIntOpcodeParam(CRunningScript* thread);
+float WINAPI CLEO_PeekFloatOpcodeParam(CRunningScript* thread);
 
 // param skip without reading
 void WINAPI CLEO_SkipOpcodeParams(CRunningScript* thread, int count);
@@ -460,6 +513,8 @@ void WINAPI CLEO_SetScriptDebugMode(CRunningScript* thread, BOOL enabled);
 
 CRunningScript* WINAPI CLEO_CreateCustomScript(CRunningScript* fromThread, const char* script_name, int label);
 CRunningScript* WINAPI CLEO_GetLastCreatedCustomScript();
+CRunningScript* WINAPI CLEO_GetScriptByName(const char* threadName, BOOL standardScripts, BOOL customScripts, DWORD resultIndex = 0); // can be called multiple times to find more scripts named threadName. resultIndex should be incremented until the method returns nullptr
+CRunningScript* WINAPI CLEO_GetScriptByFilename(const char* path, DWORD resultIndex = 0); // can be absolute, partial path or just filename
 
 // scripts deletion callback
 void WINAPI CLEO_AddScriptDeleteDelegate(FuncScriptDeleteDelegateT func);

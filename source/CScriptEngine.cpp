@@ -83,6 +83,8 @@ namespace CLEO
             push count
             call FUNC_GetScriptParams
         }
+
+        GetInstance().OpcodeSystem.handledParamCount += count;
     }
 
     void __fastcall _TransmitScriptParams(CRunningScript *pScript, int dummy, CRunningScript *pScriptB)
@@ -103,6 +105,8 @@ namespace CLEO
             push count
             call FUNC_SetScriptParams
         }
+
+        GetInstance().OpcodeSystem.handledParamCount += count;
     }
 
     void __fastcall _SetScriptCondResult(CRunningScript *pScript, int dummy, int val)
@@ -165,6 +169,29 @@ namespace CLEO
                 return CLEO::eCLEO_Version::CLEO_VER_CUR;
         }
 
+        LPCSTR WINAPI CLEO_GetScriptFilename(const CRunningScript* thread)
+        {
+            if (!GetInstance().ScriptEngine.IsValidScriptPtr(thread))
+            {
+                return nullptr;
+            }
+
+            auto cs = (CCustomScript*)thread;
+            return cs->GetScriptFileName();
+        }
+
+        LPCSTR WINAPI CLEO_GetScriptWorkDir(const CRunningScript* thread)
+        {
+            auto cs = (CCustomScript*)thread;
+            return cs->GetWorkDir();
+        }
+
+        void WINAPI CLEO_SetScriptWorkDir(CRunningScript* thread, const char* path)
+        {
+            auto cs = (CCustomScript*)thread;
+            cs->SetWorkDir(path);
+        }
+
         SCRIPT_VAR *opcodeParams;
         SCRIPT_VAR *missionLocals;
         CRunningScript *staticThreads;
@@ -182,7 +209,6 @@ namespace CLEO
     BYTE *scriptTexts;
 
     CRunningScript **inactiveThreadQueue, **activeThreadQueue;
-	CCustomScript *lastScriptCreated = nullptr;
 
 
     extern "C" void __stdcall opcode_004E(CCustomScript *pScript)
@@ -792,11 +818,6 @@ namespace CLEO
         inj.InjectFunction(&opcode_004E_hook, gvm.TranslateMemoryAddress(MA_OPCODE_004E));
     }
 
-    CScriptEngine::CScriptEngine()
-    {
-        CustomMission = nullptr;
-    }
-
     CScriptEngine::~CScriptEngine()
     {
         GameEnd();
@@ -1029,27 +1050,95 @@ namespace CLEO
         }
     }
 
-    CRunningScript *CScriptEngine::FindScriptNamed(const char *name)
+    CRunningScript* CScriptEngine::FindScriptNamed(const char* threadName, bool standardScripts, bool customScripts, size_t resultIndex)
     {
-        for (auto script = *activeThreadQueue; script; script = script->GetNext())
+        if (standardScripts)
         {
-            if (_stricmp(name, script->GetName().c_str()) == 0)
-                return script;
+            for (auto script = *activeThreadQueue; script; script = script->GetNext())
+            {
+                if (_strnicmp(threadName, script->Name, sizeof(script->Name)) == 0)
+                {
+                    if (resultIndex == 0) return script;
+                    else resultIndex--;
+                }
+            }
         }
+
+        if (customScripts)
+        {
+            if (CustomMission)
+            {
+                if (_strnicmp(threadName, CustomMission->Name, sizeof(CustomMission->Name)) == 0)
+                {
+                    if (resultIndex == 0) return CustomMission;
+                    else resultIndex--;
+                }
+            }
+
+            for (auto it = CustomScripts.begin(); it != CustomScripts.end(); ++it)
+            {
+                auto cs = *it;
+                if (_strnicmp(threadName, cs->Name, sizeof(cs->Name)) == 0)
+                {
+                    if (resultIndex == 0) return cs;
+                    else resultIndex--;
+                }
+            }
+        }
+
         return nullptr;
     }
-    CCustomScript *CScriptEngine::FindCustomScriptNamed(const char *name)
+
+    CRunningScript* CScriptEngine::FindScriptByFilename(const char* path, size_t resultIndex)
     {
-        if (CustomMission)
+        if (path == nullptr) return nullptr;
+
+        auto pathLen = strlen(path);
+        auto CheckScript = [&](CRunningScript* script)
         {
-            if (_stricmp(name, CustomMission->GetName().c_str()) == 0) return CustomMission;
+            if (script == nullptr) return false;
+
+            auto cs = (CCustomScript*)script;
+            std::string scriptPath = cs->GetScriptFileDir();
+            scriptPath += '\\';
+            scriptPath += cs->GetScriptFileName();
+
+            if (scriptPath.length() < pathLen) return false;
+
+            auto startPos = scriptPath.length() - pathLen;
+            if (_strnicmp(path, scriptPath.c_str() + startPos, pathLen) == 0)
+            {
+                if (startPos > 0 && path[startPos - 1] != '\\') return false; // whole file/dir name must match
+
+                return true;
+            }
+        };
+
+        // standard scripts
+        for (auto script = *activeThreadQueue; script; script = script->GetNext())
+        {
+            if (CheckScript(script))
+            {
+                if (resultIndex == 0) return script;
+                else resultIndex--;
+            }
+        }
+
+        // custom scripts
+        if (CheckScript(CustomMission))
+        {
+            if (resultIndex == 0) return CustomMission;
+            else resultIndex--;
         }
 
         for (auto it = CustomScripts.begin(); it != CustomScripts.end(); ++it)
         {
             auto cs = *it;
-            if (_stricmp(name, cs->GetName().c_str()) == 0)
-                return cs;
+            if (CheckScript(cs))
+            {
+                if (resultIndex == 0) return cs;
+                else resultIndex--;
+            }
         }
 
         return nullptr;
@@ -1348,7 +1437,7 @@ namespace CLEO
                     memcpy(Name, fName.c_str(), len);
                 }
             }
-            lastScriptCreated = this;
+            GetInstance().ScriptEngine.LastScriptCreated = this;
             bOK = true;
         }
         catch (std::exception& e)
@@ -1365,7 +1454,8 @@ namespace CLEO
     {
         if (BaseIP && !bIsMission) delete[] BaseIP;
         RunScriptDeleteDelegate(reinterpret_cast<CRunningScript*>(this));
-        if (lastScriptCreated == this) lastScriptCreated = nullptr;
+
+        if (GetInstance().ScriptEngine.LastScriptCreated == this) GetInstance().ScriptEngine.LastScriptCreated = nullptr;
     }
 
     float VectorSqrMagnitude(CVector vector) { return vector.x * vector.x + vector.y * vector.y + vector.z * vector.z; }

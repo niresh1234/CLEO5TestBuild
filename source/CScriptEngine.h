@@ -97,16 +97,18 @@ namespace CLEO
 
     class CScriptEngine : VInjectible
     {
+    public:
         bool gameInProgress = false;
 
         friend class CCustomScript;
         std::list<CCustomScript *> CustomScripts;
         std::list<CCustomScript *> ScriptsWaitingForDelete;
         std::set<unsigned long> InactiveScriptHashes;
-        CCustomScript *CustomMission;
+        CCustomScript *CustomMission = nullptr;
+        CCustomScript *LastScriptCreated = nullptr;
 
         CCustomScript *LoadScript(const char *szFilePath);
-    public:
+
         bool NativeScriptsDebugMode; // debug mode enabled?
         std::string MainScriptFileDir;
         std::string MainScriptFileName;
@@ -114,7 +116,7 @@ namespace CLEO
 
         static SCRIPT_VAR CleoVariables[0x400];
 
-        CScriptEngine();
+        CScriptEngine() = default;
         ~CScriptEngine();
         
         virtual void Inject(CCodeInjector&);
@@ -128,8 +130,8 @@ namespace CLEO
         void LoadState(int saveSlot);
         void SaveState();
 
-        CRunningScript*	FindScriptNamed(const char *);
-        CCustomScript*	FindCustomScriptNamed(const char*);
+        CRunningScript* FindScriptNamed(const char* threadName, bool standardScripts, bool customScripts, size_t resultIndex = 0); // can be called multiple times to find more scripts named threadName. resultIndex should be incremented until the method returns nullptr
+        CRunningScript* FindScriptByFilename(const char* path, size_t resultIndex = 0); // if path is not absolute it will be resolved with cleo directory as root
         bool IsValidScriptPtr(const CRunningScript*) const; // leads to active script? (regular or custom)
         void AddCustomScript(CCustomScript*);
         void RemoveCustomScript(CCustomScript*);
@@ -162,13 +164,10 @@ namespace CLEO
     }
 
     extern "C" {
-        extern SCRIPT_VAR *opcodeParams;
-        extern SCRIPT_VAR *missionLocals;
         extern CRunningScript *staticThreads;
     }
 
     extern BYTE *scmBlock, *missionBlock;
-    extern CCustomScript *lastScriptCreated;
 
 	extern float VectorSqrMagnitude(CVector vector);
 }
