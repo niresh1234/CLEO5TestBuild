@@ -288,6 +288,7 @@ const char DIR_MODULES[] = "modules:"; // game\cleo\modules directory
 enum class eCallbackId : DWORD
 {
 	GameBegin, // void WINAPI OnGameBegin(DWORD saveSlot); // -1 if not started from save
+	GameProcess, // void WINAPI OnGameProcess(); // called once every frame during gameplay
 	GameEnd, // void WINAPI OnGameEnd();
 	ScriptsLoaded, // void WINAPI OnScriptsLoaded();
 	ScriptsFinalize, // void WINAPI OnScriptsFinalize();
@@ -299,6 +300,7 @@ enum class eCallbackId : DWORD
 	ScriptDraw, // void WINAPI OnScriptDraw(bool beforeFade);
 	DrawingFinished, // void WINAPI OnDrawingFinished(); // called after game rendered everything and before presenting screen buffer
 	Log, // void OnLog(eLogLevel level, const char* msg);
+	MainWindowFocus, // void WINAPI OnMainWindowFocus(bool active); // called when game main window focus changes
 };
 
 // used by CLEO_Log and Log callback
@@ -322,7 +324,6 @@ typedef int SCRIPT_HANDLE;
 typedef SCRIPT_HANDLE HANDLE_ACTOR, ACTOR, HACTOR, PED, HPED, HANDLE_PED;
 typedef SCRIPT_HANDLE HANDLE_CAR, CAR, HCAR, VEHICLE, HVEHICLE, HANDLE_VEHICLE;
 typedef SCRIPT_HANDLE HANDLE_OBJECT, OBJECT, HOBJECT;
-typedef SCRIPT_HANDLE HSTREAM;
  
 #pragma pack(push,1)
 #ifdef __cplusplus
@@ -522,7 +523,7 @@ void WINAPI CLEO_RemoveScriptDeleteDelegate(FuncScriptDeleteDelegateT func);
 
 DWORD WINAPI CLEO_GetScriptTextureById(CRunningScript* thread, int id); // ret RwTexture *
 
-HSTREAM WINAPI CLEO_GetInternalAudioStream(CRunningScript* thread, DWORD stream); // arg CAudioStream *
+DWORD WINAPI CLEO_GetInternalAudioStream(CRunningScript* thread, DWORD stream); // arg CAudioStream *
 
 void WINAPI CLEO_ResolvePath(CRunningScript* thread, char* inOutPath, DWORD pathMaxLen); // convert to absolute (file system) path
 
