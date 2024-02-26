@@ -209,7 +209,7 @@ namespace CLEO
 
 	CCustomOpcodeSystem::CCustomOpcodeSystem()
 	{
-		// register CLEO opcodes
+		TRACE("Initializing CLEO core opcodes...");
 		CLEO_RegisterOpcode(0x0A92, opcode_0A92);
 		CLEO_RegisterOpcode(0x0A93, opcode_0A93);
 		CLEO_RegisterOpcode(0x0A94, opcode_0A94);
@@ -2018,7 +2018,7 @@ extern "C"
 		return texture;
 	}
 
-	CLEO::HSTREAM WINAPI CLEO_GetInternalAudioStream(CLEO::CRunningScript* thread, DWORD stream) // arg CAudioStream *
+	DWORD WINAPI CLEO_GetInternalAudioStream(CLEO::CRunningScript* thread, DWORD stream) // arg CAudioStream *
 	{
 		return stream; // CAudioStream::streamInternal offset is 0
 	}
