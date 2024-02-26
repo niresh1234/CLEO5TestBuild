@@ -1,6 +1,5 @@
 #include "stdafx.h"
 #include "CleoBase.h"
-#include "CLegacy.h"
 #include "CGameVersionManager.h"
 #include "CCustomOpcodeSystem.h"
 #include "ScmFunction.h"
