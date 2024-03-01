@@ -169,7 +169,15 @@ namespace CLEO
 
 			if (opcode > LastOriginalOpcode)
 			{
-				SHOW_ERROR("Opcode [%04X] not registered! \nCalled in script %s\nPreviously called opcode: [%04X]\nScript suspended.", opcode, ((CCustomScript*)thread)->GetInfoStr().c_str(), prevOpcode);
+				auto extensionMsg = GetInstance().OpcodeInfoDb.GetExtensionMissingMessage(opcode);
+				if (!extensionMsg.empty()) extensionMsg = " " + extensionMsg;
+
+				SHOW_ERROR("Custom opcode [%04X] not registered!%s\nCalled in script %s\nPreviously called opcode: [%04X]\nScript suspended.",
+					opcode,
+					extensionMsg.c_str(),
+					((CCustomScript*)thread)->GetInfoStr().c_str(), 
+					prevOpcode);
+
 				return thread->Suspend();
 			}
 
@@ -178,7 +186,15 @@ namespace CLEO
 
 			if(result == OR_ERROR)
 			{
-				SHOW_ERROR("Opcode [%04X] not found! \nCalled in script %s\nScript suspended.", opcode, ((CCustomScript*)thread)->GetInfoStr().c_str());
+				auto extensionMsg = GetInstance().OpcodeInfoDb.GetExtensionMissingMessage(opcode);
+				if (!extensionMsg.empty()) extensionMsg = " " + extensionMsg;
+
+				SHOW_ERROR("Opcode [%04X] not found!%s\nCalled in script %s\nPreviously called opcode: [%04X]\nScript suspended.",
+					opcode,
+					extensionMsg.c_str(),
+					((CCustomScript*)thread)->GetInfoStr().c_str(), 
+					prevOpcode);
+
 				return thread->Suspend();
 			}
 		}
@@ -1776,6 +1792,18 @@ extern "C"
 
 	BOOL WINAPI CLEO_RegisterOpcode(WORD opcode, CustomOpcodeHandler callback)
 	{
+		return CCustomOpcodeSystem::RegisterOpcode(opcode, callback);
+	}
+
+	BOOL WINAPI CLEO_RegisterCommand(const char* commandName, CustomOpcodeHandler callback)
+	{
+		WORD opcode = GetInstance().OpcodeInfoDb.GetOpcode(commandName);
+		if (opcode == 0xFFFF)
+		{
+			LOG_WARNING(0, "Failed to register opcode [%s]! Command name not found in the database.", commandName);
+			return false;
+		}
+
 		return CCustomOpcodeSystem::RegisterOpcode(opcode, callback);
 	}
 
