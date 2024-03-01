@@ -67,7 +67,11 @@ namespace CLEO
         bool needTerminator = false;
     };
 
-    char* ReadStringParam(CRunningScript* thread, char* buf = nullptr, DWORD bufSize = 0); // null terminated
+    // Read null-terminated string into the buffer
+    // returns pointer to string or nullptr on fail
+    // WARNING: returned pointer may differ from buff and contain string longer than buffSize (ptr to original data source)
+    const char* ReadStringParam(CRunningScript* thread, char* buff, int buffSize);
+
     StringParamBufferInfo GetStringParamWriteBuffer(CRunningScript* thread); // consumes the param
     int ReadFormattedString(CRunningScript* thread, char* buf, DWORD bufSize, const char* format);
 
