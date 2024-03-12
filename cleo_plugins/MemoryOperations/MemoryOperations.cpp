@@ -2,6 +2,7 @@
 #include "CLEO_Utils.h"
 #include "plugin.h"
 #include "CTheScripts.h"
+#include <filesystem>
 #include <set>
 
 using namespace CLEO;
@@ -361,7 +362,17 @@ public:
     //0AA2=2, load_dynamic_library %1s% store_to %2d% // IF and SET
     static OpcodeResult __stdcall opcode_0AA2(CLEO::CRunningScript* thread)
     {
-        OPCODE_READ_PARAM_FILEPATH(path);
+        OPCODE_READ_PARAM_STRING(path);
+        
+        // get absolute path
+        // in case of just filename let LoadLibrary resolve it itself
+        char buff[MAX_PATH];
+        if (std::filesystem::path(path).has_parent_path())
+        {
+            strncpy(buff, path, sizeof(buff));
+            CLEO_ResolvePath(thread, buff, sizeof(buff));
+            path = buff;
+        }
 
         auto ptr = LoadLibrary(path);
         if (ptr != nullptr)
