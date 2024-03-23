@@ -134,7 +134,7 @@ void ScreenLog::Draw()
         alpha = std::clamp(int(alpha * alpha) / 255, 0, 255); // corrected for fadeout
         CFont::SetDropColor(CRGBA(0, 0, 0, alpha));
 
-        float y = posY + 18.0f * sizeY * lines;
+        float y = posY + Row_Height * sizeY * lines;
         lines += CountLines(entry.msg);
 
         CFont::PrintString(posX, y, entry.GetMsg());
