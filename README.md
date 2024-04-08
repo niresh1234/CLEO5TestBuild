@@ -8,13 +8,14 @@ CLEO requires an 'ASI Loader' installed to run which is provided with the releas
 No additional files are replaced, however the following files and folders are added:
 
 - cleo\ (CLEO script directory)
-- cleo\.config\sa.json (opcodes info file)
+- cleo\\.config\sa.json (opcodes info file)
 - cleo\cleo_plugins\SA.Audio.cleo (audio playback utilities powered by BASS.dll library)
 - cleo\cleo_plugins\SA.DebugUtils.cleo (script debugging utilities plugin)
 - cleo\cleo_plugins\SA.FileSystemOperations.cleo (disk drive files related operations plugin)
 - cleo\cleo_plugins\SA.IniFiles.cleo (.ini config files handling plugin)
 - cleo\cleo_plugins\SA.IntOperations.cleo (additional math operations plugin)
-- cleo\cleo_plugins\SA.MemoryOperations (memory and .dll libraries utilities plugin)
+- cleo\cleo_plugins\SA.MemoryOperations.cleo (memory and .dll libraries utilities plugin)
+- cleo\cleo_plugins\SA.Text.cleo (text processing plugin)
 - cleo\cleo_saves\ (CLEO save directory)
 - cleo\cleo_text\ (CLEO text directory)
 - cleo.asi (core library)
@@ -36,7 +37,9 @@ CLEO scripts can be found on Grand Theft Auto fansites and modding sites such as
 
 ## Compatibility Mode
 
-CLEO is continually being improved and extended over time. In very rare circumstances, some scripts written for CLEO 3 may not work while using CLEO 4. However, since CLEO 4.3 you are able to enable a 'legacy mode' to increase compatibility with CLEO 3 scripts by naming them with the extension '.cs3'. CLEO 4.3 will load '.cs' and '.cs4' scripts normally and load '.cs3' scripts in CLEO 3 compatibility mode, in which certain small behaviours of the CLEO library will change to achieve better compatibility with that script. However, most CLEO 3 scripts will work without the need for compatibility mode being set as CLEO 4.3 also detects certain necessary CLEO 3 behaviours. Specifically, scripts which use the uninitialized storage data after a SCM function call to work.
+CLEO is continually being improved and extended over time. In very rare circumstances, new major releases may break some older scripts. To fix this, CLEO provides a 'compatibility mode' to closely emulate behavior of previous versions and improve stability of old scripts. 
+- To run a script with maximum compatibility with 'CLEO 4', change the script extension from `.cs` to `.cs4`.
+- To run a script with maximum compatibility with 'CLEO 3', change the script extension from `.cs` to `.cs3`. 
 
 ## Credits
 
@@ -51,5 +54,5 @@ Special thanks to:
 - mfisto for the alpha-testing of CLEO 4, his support and advices.
 - 123nir for the alpha-testing of CLEO 5.0.0, troubleshooting and valuable bug reports.
 
-The developers have no connection with Take 2 Interactive or Rockstar Games.
+The developers are not affiliated with Take 2 Interactive or Rockstar Games.
 By using this product or any of the additional products included you take your own personal responsibility for any negative consequences should they arise.
