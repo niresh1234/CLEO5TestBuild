@@ -21,6 +21,8 @@ namespace CLEO
     
     OPCODE_CONDITION_RESULT(value) // set result
     OPCODE_SKIP_PARAMS(count) // ignore X params
+
+    OPCODE_PEEK_PARAM_TYPE() // get param type without advancing the script
     
     // reading opcode input arguments
     OPCODE_READ_PARAM_BOOL()
@@ -458,11 +460,12 @@ namespace CLEO
     }
 
     #define OPCODE_SKIP_PARAMS(_count) CLEO_SkipOpcodeParams(thread, _count)
+    #define OPCODE_PEEK_PARAM_TYPE() thread->PeekDataType()
 
     // macros for reading opcode input params. Performs type validation, throws error and suspends script if user provided invalid argument type
     // TOD: add range checks for limited size types?
 
-    #define OPCODE_READ_PARAM_BOOL() _readParam(thread).bParam; \
+    #define OPCODE_READ_PARAM_BOOL() _readParam(thread).dwParam != false; \
         if (!_paramWasInt()) { SHOW_ERROR("Input argument %s expected to be integer, got %s in script %s\nScript suspended.", GetParamInfo().c_str(), CLEO::ToKindStr(_lastParamType, _lastParamArrayType), CLEO::ScriptInfoStr(thread).c_str()); return thread->Suspend(); }
 
     #define OPCODE_READ_PARAM_INT8() _readParam(thread).cParam; \
