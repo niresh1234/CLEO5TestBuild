@@ -1,0 +1,32 @@
+name: CLEO 5 Release Build
+
+on:
+  push:
+    branch:
+      - gh
+
+jobs:
+  build:
+    runs-on: windows-2019
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+
+      - name: Add msbuild to PATH
+        uses: microsoft/setup-msbuild@v1
+
+      - name: Build Projects
+        shell: cmd
+        run: |
+          set PLUGIN_SDK_DIR=%GITHUB_WORKSPACE%\third-party\plugin-sdk
+          msbuild -m CLEO4.sln /property:Configuration=Release /property:Platform=GTASA
+
+      - name: VirusTotal Scan
+        uses: crazy-max/ghaction-virustotal@v4
+        with:
+          vt_api_key: ${{ secrets.VT_KEY }}
+          files: |
+            ./.output/Release/CLEO.asi
+            ./output/Release/CLEO.asi
