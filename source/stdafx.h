@@ -27,6 +27,7 @@
 #include <game_sa/CPlayerPed.h>
 #include <game_sa/CRadar.h>
 
+#include "CleoVersion.h"
 #include "CTheScripts.h"
 
 enum CLEO_Version
@@ -40,7 +41,7 @@ enum CLEO_Version
     CLEO_VER_4_4 = 0x0404,
     CLEO_VER_4 = CLEO_VER_4_4,
 
-    CLEO_VERSION = CLEO_VER_4,
+    //CLEO_VERSION = CLEO_VER_4,
 };
 #define VERSION_LONG		0x04040400
 #define VERSION_STRING	"4.4.4"

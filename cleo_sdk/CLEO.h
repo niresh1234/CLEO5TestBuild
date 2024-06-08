@@ -41,6 +41,12 @@ typedef union
 #define	globalVarSString 	0x0A	//s$
 #define	localVarSString 	0x0B	//@s
 
+// CLEO virtual paths prefixes. Expandable with CLEO_ResolvePath
+const char DIR_GAME[] = "0:"; // game root directory
+const char DIR_USER[] = "1:"; // game save directory
+const char DIR_SCRIPT[] = "2:"; // current script directory
+const char DIR_CLEO[] = "3:"; // game\cleo directory
+const char DIR_MODULES[] = "4:"; // game\cleo\modules directory
 
 typedef int SCRIPT_HANDLE;
 typedef SCRIPT_HANDLE HANDLE_ACTOR, ACTOR, HACTOR, PED, HPED, HANDLE_PED;
@@ -139,6 +145,9 @@ CScriptThread* WINAPI CLEO_GetLastCreatedCustomScript();
 void WINAPI CLEO_AddScriptDeleteDelegate(FuncScriptDeleteDelegateT func);
 
 void WINAPI CLEO_RemoveScriptDeleteDelegate(FuncScriptDeleteDelegateT func);
+
+// convert to absolute file path
+void WINAPI CLEO_ResolvePath(CScriptThread* thread, char* inOutPath, DWORD pathMaxLen);
 
 #ifdef __cplusplus
 }

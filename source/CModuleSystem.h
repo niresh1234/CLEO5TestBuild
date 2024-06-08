@@ -1,6 +1,6 @@
 #pragma once
 #include <atomic>
-#include <filesystem>
+// #include <filesystem>
 #include <map>
 #include <mutex>
 #include <thread>
@@ -24,7 +24,7 @@ namespace CLEO
 		void Clear();
 
 		// registers module reference. Needs to be released with ReleaseModuleRef
-		const ScriptDataRef GetExport(const char* moduleName, const char* exportName);
+		const ScriptDataRef GetExport(std::string modulePath, std::string_view exportName);
 
 		bool LoadFile(const char* const path); // single file
 		bool LoadDirectory(const char* const path); // all modules in directory
@@ -58,7 +58,7 @@ namespace CLEO
 
 			// hot reloading when source file modified
 			std::atomic<int> refCount = 0;
-			std::filesystem::file_time_type fileTime; // last write time of source file
+			//std::filesystem::file_time_type fileTime; // last write time of source file
 			void Update();
 			std::atomic<bool> updateActive = true;
 			std::atomic<bool> updateNeeded = false;
@@ -72,7 +72,7 @@ namespace CLEO
 			void Clear();
 			const char* GetFilepath() const;
 			bool LoadFromFile(const char* path);
-			const ScriptDataRef GetExport(const char* name);
+			const ScriptDataRef GetExport(std::string name);
 		};
 
 		std::map<std::string, CModule> modules;
