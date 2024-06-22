@@ -311,24 +311,19 @@ namespace CLEO
     CRunningScript **inactiveThreadQueue, **activeThreadQueue;
 
 
-    extern "C" void __stdcall opcode_004E(CCustomScript *pScript)
+    extern "C" void __stdcall opcode_004E(CCustomScript *pScript) // terminate_this_script
     {
         if (pScript->IsCustom())
         {
-            if (!pScript->IsMission())
+            if (pScript->IsMission())
+                *MissionLoaded = false;
+            else
             {
                 TRACE("Incorrect usage of opcode [004E] in script %s.", pScript->GetName().c_str());
             }
-            else *MissionLoaded = false;
-            GetInstance().ScriptEngine.RemoveCustomScript(pScript);
         }
-        else
-        {
-            if (pScript->IsMission()) *MissionLoaded = false;
-            RemoveScriptFromQueue(pScript, activeThreadQueue);
-            AddScriptToQueue(pScript, inactiveThreadQueue);
-            StopScript(pScript);
-        }
+
+        GetInstance().ScriptEngine.RemoveScript(pScript);
     }
 
     extern "C" void __declspec(naked) opcode_004E_hook(void)
@@ -1287,6 +1282,23 @@ namespace CLEO
         return nullptr;
     }
 
+    bool CScriptEngine::IsActiveScriptPtr(const CRunningScript* ptr) const
+    {
+        for (auto script = *activeThreadQueue; script != nullptr; script = script->GetNext())
+        {
+            if (script == ptr)
+                return ptr->IsActive();
+        }
+
+        for (const auto script : CustomScripts)
+        {
+            if (script == ptr)
+                return ptr->IsActive();
+        }
+
+        return false;
+    }
+
     bool CScriptEngine::IsValidScriptPtr(const CRunningScript* ptr) const
     {
         for (auto script = *activeThreadQueue; script != nullptr; script = script->GetNext())
@@ -1295,7 +1307,19 @@ namespace CLEO
                 return true;
         }
 
+        for (auto script = *inactiveThreadQueue; script != nullptr; script = script->GetNext())
+        {
+            if (script == ptr)
+                return true;
+        }
+
         for (const auto script : CustomScripts)
+        {
+            if (script == ptr)
+                return true;
+        }
+
+        for (const auto script : ScriptsWaitingForDelete)
         {
             if (script == ptr)
                 return true;
@@ -1324,6 +1348,21 @@ namespace CLEO
         {
             typedef void WINAPI callback(CCustomScript*);
             ((callback*)func)(cs);
+        }
+    }
+
+    void CScriptEngine::RemoveScript(CRunningScript* thread)
+    {
+        if (!thread->IsCustom())
+        {
+            if (thread->IsMission()) *MissionLoaded = false;
+            RemoveScriptFromQueue(thread, activeThreadQueue);
+            AddScriptToQueue(thread, inactiveThreadQueue);
+            StopScript(thread);
+        }
+        else
+        {
+            RemoveCustomScript((CCustomScript*)thread);
         }
     }
 

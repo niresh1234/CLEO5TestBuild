@@ -467,6 +467,7 @@ void WINAPI CLEO_RegisterCallback(eCallbackId id, void* func);
 
 
 // script utils
+BOOL WINAPI CLEO_IsScriptRunning(const CRunningScript* thread); // check if script is active
 void WINAPI CLEO_GetScriptInfoStr(CRunningScript* thread, bool currLineInfo, char* buf, DWORD bufSize); // short text for displaying in error\log messages
 void WINAPI CLEO_GetScriptParamInfoStr(int idexOffset, char* buf, DWORD bufSize); // short text with current+offset opcode parameter info (index and name if available)
 eCLEO_Version WINAPI CLEO_GetScriptVersion(const CRunningScript* thread); // compatibility mode
@@ -477,6 +478,7 @@ void WINAPI CLEO_SetScriptWorkDir(CRunningScript* thread, const char* path);
 
 void WINAPI CLEO_SetThreadCondResult(CRunningScript* thread, BOOL result);
 void WINAPI CLEO_ThreadJumpAtLabelPtr(CRunningScript* thread, int labelPtr);
+void WINAPI CLEO_TerminateScript(CRunningScript* thread);
 
 int WINAPI CLEO_GetOperandType(const CRunningScript* thread); // peek parameter data type. Returns int for legacy reason, should be eDataType.
 DWORD WINAPI CLEO_GetVarArgCount(CRunningScript* thread); // peek remaining var-args count
