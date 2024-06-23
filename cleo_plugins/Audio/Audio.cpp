@@ -105,7 +105,10 @@ public:
     //0AAC=2,  %2d% = load_audiostream %1d%  // IF and SET
     static OpcodeResult __stdcall opcode_0AAC(CScriptThread* thread)
     {
-        OPCODE_READ_PARAM_FILEPATH(path);
+        OPCODE_READ_PARAM_STRING_LEN(path, 511);
+
+        if (!isNetworkSource(path))
+            CLEO_ResolvePath(thread, _buff_path, sizeof(_buff_path));
 
         auto ptr = soundSystem.CreateStream(path);
 
@@ -207,7 +210,10 @@ public:
     //0AC1=2,%2d% = load_audiostream_with_3d_support %1d% //IF and SET
     static OpcodeResult __stdcall opcode_0AC1(CScriptThread* thread)
     {
-        OPCODE_READ_PARAM_FILEPATH(path);
+        OPCODE_READ_PARAM_STRING_LEN(path, 511);
+
+        if (!isNetworkSource(path))
+            CLEO_ResolvePath(thread, _buff_path, sizeof(_buff_path));
 
         auto ptr = soundSystem.CreateStream(path, true);
 
@@ -414,4 +420,3 @@ public:
 } audioInstance;
 
 CSoundSystem Audio::soundSystem;
-
