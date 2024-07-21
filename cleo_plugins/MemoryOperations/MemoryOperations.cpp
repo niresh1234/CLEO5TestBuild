@@ -85,32 +85,30 @@ public:
     // opcodes 0AA5 - 0AA8
     static OpcodeResult CallFunctionGeneric(CLEO::CRunningScript* thread, void* func, void* obj, int numArg, int numPop, bool returnArg)
     {
-        int nVarArg = CLEO_GetVarArgCount(thread);
-        if (numArg + returnArg != nVarArg) // and return argument
+        auto inputArgCount = (int)CLEO_GetVarArgCount(thread) - returnArg; // return slot not counted as input argument
+
+        constexpr size_t Max_Args = 32;
+        if (inputArgCount > Max_Args)
         {
-            SHOW_ERROR("Declared %d input args, but provided %d in script %s\nScript suspended.", numArg, (int)nVarArg - returnArg, CLEO::ScriptInfoStr(thread).c_str());
+            SHOW_ERROR("Provided more (%d) than supported (%d) arguments in script %s\nScript suspended.", inputArgCount, Max_Args, CLEO::ScriptInfoStr(thread).c_str());
             return thread->Suspend();
         }
 
-        constexpr size_t Max_Args = 32;
-        if (nVarArg > Max_Args)
+        if (numArg != inputArgCount && !IsLegacyScript(thread)) // CLEO4 ignored param count missmatch (by providing zeros for missing)
         {
-            SHOW_ERROR("Provided more (%d) than supported (%d) arguments in script %s\nScript suspended.", nVarArg, Max_Args, CLEO::ScriptInfoStr(thread).c_str());
+            SHOW_ERROR("Declared %d input args, but provided %d in script %s\nScript suspended.\n\nTo ignore this error, change the file extension from .cs to .cs4 and restart the game.", numArg, inputArgCount, CLEO::ScriptInfoStr(thread).c_str());
             return thread->Suspend();
         }
 
         static SCRIPT_VAR arguments[Max_Args] = { 0 };
-        SCRIPT_VAR* arguments_end = arguments + numArg;
 
         constexpr size_t Max_Text_Params = 5;
         static char textParams[Max_Text_Params][MAX_STR_LEN];
         size_t currTextParam = 0;
 
-        numPop *= 4; // bytes peer argument
-
         // retrieve parameters
         auto scriptParams = CLEO_GetOpcodeParamsArray();
-        for (size_t i = 0; i < (size_t)numArg; i++)
+        for (size_t i = 0; i < std::min<size_t>(numArg, inputArgCount); i++)
         {
             auto& param = arguments[i];
 
@@ -128,7 +126,7 @@ public:
                         // read result from 0@
                     */
                     param.pParam = CLEO_GetPointerToScriptVariable(thread);
-				}   		  
+                }
                 else
                 {
                     if (currTextParam >= Max_Text_Params)
@@ -155,6 +153,8 @@ public:
             }
         }
 
+        SCRIPT_VAR* arguments_end = arguments + numArg;
+        numPop *= 4; // bytes peer argument
         DWORD result;
         _asm
         {
@@ -542,7 +542,7 @@ public:
     static OpcodeResult __stdcall opcode_0AC7(CLEO::CRunningScript* thread)
     {
         auto resultType = thread->PeekDataType();
-        if (!IsVariable(resultType) && IsVarString(resultType))
+        if (!IsVariable(resultType) && !IsVarString(resultType))
         {
             SHOW_ERROR("Input argument #%d expected to be variable, got constant in script %s\nScript suspended.", CLEO_GetParamsHandledCount(), ScriptInfoStr(thread).c_str());
             return thread->Suspend();
