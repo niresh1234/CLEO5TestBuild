@@ -72,6 +72,10 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="third-party\simdjson\simdjson.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="cleo_sdk\CLEO.h" />
@@ -94,6 +98,7 @@
     <ClInclude Include="source\ScmFunction.h" />
     <ClInclude Include="source\Singleton.h" />
     <ClInclude Include="source\stdafx.h" />
+    <ClInclude Include="third-party\simdjson\simdjson.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="source\cleo.def" />
@@ -114,14 +119,14 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <CharacterSet>MultiByte</CharacterSet>
+    <CharacterSet>Unicode</CharacterSet>
     <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <CharacterSet>MultiByte</CharacterSet>
+    <CharacterSet>Unicode</CharacterSet>
     <PlatformToolset>v143</PlatformToolset>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
@@ -139,14 +144,16 @@
     <IntDir>$(SolutionDir).output\.obj\$(Configuration)\</IntDir>
     <TargetName>CLEO</TargetName>
     <TargetExt>.asi</TargetExt>
-    <IncludePath>$(PLUGIN_SDK_DIR)\shared\;$(PLUGIN_SDK_DIR)\shared\game\;$(SolutionDir)third-party\SimpleJSON;$(IncludePath)</IncludePath>
+    <IncludePath>$(PLUGIN_SDK_DIR)\shared\;$(PLUGIN_SDK_DIR)\shared\game\;$(SolutionDir)third-party\simdjson;$(IncludePath)</IncludePath>
+    <GenerateManifest>false</GenerateManifest>
+    <EmbedManifest>false</EmbedManifest>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <OutDir>$(SolutionDir).output\$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir).output\.obj\$(Configuration)\</IntDir>
     <TargetName>CLEO</TargetName>
     <TargetExt>.asi</TargetExt>
-    <IncludePath>$(PLUGIN_SDK_DIR)\shared\;$(PLUGIN_SDK_DIR)\shared\game\;$(SolutionDir)third-party\SimpleJSON;$(IncludePath)</IncludePath>
+    <IncludePath>$(PLUGIN_SDK_DIR)\shared\;$(PLUGIN_SDK_DIR)\shared\game\;$(SolutionDir)third-party\simdjson;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup>
     <LocalDebuggerCommand>$(GTA_SA_DIR)\gta_sa.exe</LocalDebuggerCommand>
@@ -168,6 +175,10 @@
       <PrecompiledHeader>Create</PrecompiledHeader>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <DebugInformationFormat>None</DebugInformationFormat>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
+      <CreateHotpatchableImage>false</CreateHotpatchableImage>
+      <GuardEHContMetadata>false</GuardEHContMetadata>
+      <RuntimeTypeInfo>false</RuntimeTypeInfo>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -178,7 +189,8 @@
       <SubSystem>Windows</SubSystem>
       <ModuleDefinitionFile>$(SolutionDir)source\cleo.def</ModuleDefinitionFile>
       <ImageHasSafeExceptionHandlers>false</ImageHasSafeExceptionHandlers>
-      <AdditionalOptions>/Brepro %(AdditionalOptions)</AdditionalOptions>
+      <EnableUAC>false</EnableUAC>
+      <AssemblyDebug>false</AssemblyDebug>
     </Link>
     <PostBuildEvent>
       <Command>xcopy /Y "$(OutDir)$(TargetName).lib" "$(SolutionDir)cleo_sdk\" 

@@ -6,7 +6,6 @@
 #include "CCheat.h"
 #include "CModelInfo.h"
 
-#include <tlhelp32.h>
 #include <sstream>
 #include <forward_list>
 #include <set>
@@ -70,30 +69,8 @@ namespace CLEO
 		template<class FuncScriptDeleteDelegateT> void operator+=(FuncScriptDeleteDelegateT mFunc) { funcs.push_back(mFunc); }
 		template<class FuncScriptDeleteDelegateT> void operator-=(FuncScriptDeleteDelegateT mFunc) { funcs.erase(std::remove(funcs.begin(), funcs.end(), mFunc), funcs.end()); }
 		void operator()(CRunningScript *script)
-		{ 
-			for (auto& f : funcs)
-			{
-				// check if function pointer lays within any of currently loaded modules (.asi or .cleo plugins)
-				void* ptr = f;
-				MODULEENTRY32 module;
-				module.dwSize = sizeof(MODULEENTRY32);
-				HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, GetCurrentProcessId());
-				Module32First(snapshot, &module);
-				if (snapshot != INVALID_HANDLE_VALUE)
-				{
-					size_t count = 0;
-					do
-					{
-						if(ptr >= module.modBaseAddr && ptr <= (module.modBaseAddr + module.modBaseSize))
-						{
-							f(script);
-							break;
-						}
-					} while (Module32Next(snapshot, &module));
-					CloseHandle(snapshot);
-				}
-			}
-			
+		{
+			for (auto& f : funcs) f(script);
 		}
 	};
 	ScriptDeleteDelegate scriptDeleteDelegate;
@@ -749,7 +726,6 @@ namespace CLEO
 
 		// handle program flow
 		scmFunc->Return(cs); // jump back to cleo_call, right after last input param. Return slot var args starts here
-		if (scmFunc->moduleExportRef != nullptr) GetInstance().ModuleSystem.ReleaseModuleRef((char*)scmFunc->moduleExportRef); // exiting export - release module
 		delete scmFunc;
 
 		if (returnArgs)
@@ -1021,7 +997,6 @@ namespace CLEO
 				SHOW_ERROR("Not found module '%s' export '%s', requested by opcode [0AB1] in script %s", modulePath.c_str(), moduleTxt.c_str(), ((CCustomScript*)thread)->GetInfoStr().c_str());
 				return thread->Suspend();
 			}
-			scmFunc->moduleExportRef = scriptRef.base; // to be released on return
 
 			reinterpret_cast<CCustomScript*>(thread)->SetScriptFileDir(FS::path(modulePath).parent_path().string().c_str());
 			reinterpret_cast<CCustomScript*>(thread)->SetScriptFileName(FS::path(modulePath).filename().string().c_str());
