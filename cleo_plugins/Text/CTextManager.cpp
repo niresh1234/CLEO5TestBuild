@@ -92,6 +92,9 @@ namespace CLEO
 
     void CTextManager::LoadFxts()
     {
+        TRACE(""); // separator
+        TRACE("Loading CLEO text files...");
+
         // create FXT directory if not present yet
         FS::create_directory(FS::path(Gta_Root_Dir_Path).append("cleo\\cleo_text"));
 
@@ -103,7 +106,7 @@ namespace CLEO
             {
                 std::ifstream stream(list.strings[i]);
                 auto result = ParseFxtFile(stream);
-                TRACE("Added %d new FXT entries from file %s", result, list.strings[i]);
+                TRACE("Added %d new FXT entries from file '%s'", result, list.strings[i]);
             }
             catch (std::exception& ex)
             {
