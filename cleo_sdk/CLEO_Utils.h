@@ -15,8 +15,10 @@
 #include "CLEO.h"
 #include "CPools.h" // from GTA Plugin SDK
 #include "shellapi.h" // game window minimize/maximize support
+#include <algorithm>
 #include <filesystem>
 #include <string>
+#include <string_view>
 #include <vector>
 #include <wtypes.h>
 
@@ -76,25 +78,11 @@ namespace CLEO
     OPCODE_WRITE_PARAM_PTR(value) // memory address
     */
 
-    static const char* Gta_Root_Dir_Path = (char*)0x00B71AE0;
-    static const char* Gta_User_Dir_Path = (char*)0x00C92368;
-
     static bool IsLegacyScript(CLEO::CRunningScript* thread)
     {
         return CLEO_GetScriptVersion(thread) < CLEO_VER_5;
     }
     
-    // this plugin's config file
-    static std::string GetConfigFilename()
-    {
-        std::string configFile = Gta_Root_Dir_Path;
-        if (!configFile.empty() && configFile.back() != '\\') configFile.push_back('\\');
-
-        configFile += "cleo\\cleo_plugins\\" TARGET_NAME ".ini";
-
-        return configFile;
-    }
-
     static std::string StringPrintf(const char* format, ...)
     {
         va_list args;
@@ -112,6 +100,23 @@ namespace CLEO
         return result;
     }
 
+    static bool StringStartsWith(const std::string_view str, const std::string_view prefix, bool caseSensitive = true)
+    {
+        if (str.length() < prefix.length())
+        {
+            return false;
+        }
+
+        if (caseSensitive)
+        {
+            return strncmp(str.data(), prefix.data(), prefix.length()) == 0;
+        }
+        else
+        {
+            return _strnicmp(str.data(), prefix.data(), prefix.length()) == 0;
+        }
+    }
+
     static std::string ScriptInfoStr(CLEO::CRunningScript* thread)
     {
         std::string info(1024, '\0');
@@ -119,27 +124,79 @@ namespace CLEO
         return std::move(info);
     }
 
-    // does file path points inside game directories? (game root or user files)
-    static bool IsFilepathSafe(CLEO::CRunningScript* thread, const char* path)
+    // Normalize filepath, collapse all parent directory references. Input should be absolute path without expandable %variables%
+    static void FilepathNormalize(std::string& path, bool normalizeCase = true)
     {
-        auto IsSubpath = [](std::filesystem::path path, std::filesystem::path base)
-        {
-            auto relative = std::filesystem::relative(path, base);
-            return !relative.empty() && *relative.begin() != "..";
-        };
+        if (path.empty()) return;
 
-        auto fsPath = std::filesystem::path(path);
-        if (!fsPath.is_absolute())
+        std::replace(path.begin(), path.end(), '/', '\\');
+        if (normalizeCase) std::transform(path.begin(), path.end(), path.begin(), [](unsigned char c) { return tolower(c); }); // to lower case
+
+        // collapse references to parent directory
+        const auto ParentRef = "\\..\\";
+        const auto ParentRefLen = 4;
+
+        size_t refPos = path.find(ParentRef);
+        while (refPos != std::string::npos && refPos > 0)
         {
-            fsPath = CLEO_GetScriptWorkDir(thread) / fsPath;
+            size_t parentPos = path.rfind('\\', refPos - 1); // find start of parent name
+
+            if (parentPos == std::string::npos)
+                return; // parent must be root of the path then. We want to keep absolute path, let it be as is (even if "C:\..\" makes no sense)
+
+            path.replace(parentPos, (refPos - parentPos) + ParentRefLen - 1, ""); // remove parent and parent reference
+
+            refPos = path.find(ParentRef); // find next
         }
 
-        if (IsSubpath(fsPath, Gta_Root_Dir_Path) || IsSubpath(fsPath, Gta_User_Dir_Path))
+        while(path.back() == '\\') path.pop_back(); // remove trailing path separator(s)
+    }
+
+    // strip parent prefix from filepath if present
+    static void FilepathRemoveParent(std::string& path, const std::string_view base)
+    {
+        if (path.length() < base.length()) return; // can not hold that prefix
+        if (!StringStartsWith(path, base, false)) return;
+        if (path.length() > base.length() && path[base.length()] != '\\') return; // just similar base
+
+        path.replace(0, base.length() + 1, ""); // remove path separator too if present
+    }
+
+    // this plugin's config file
+    static std::string GetConfigFilename()
+    {
+        std::string path = CLEO_GetGameDirectory();
+        path += "\\cleo\\cleo_plugins\\";
+        path += TARGET_NAME;
+        path += ".ini";
+        return path;
+    }
+
+    // does normalized file path points inside game directories? (game root or user files)
+    static bool FilepathIsSafe(CLEO::CRunningScript* thread, const char* path)
+    {
+        if (strchr(path, '%') != nullptr)
         {
-            return true;
+            return false; // do not allow paths containing expandable variables
         }
 
-        return false;
+        std::string absolute;
+        if (!std::filesystem::path(path).is_absolute())
+        {
+            absolute = CLEO_GetScriptWorkDir(thread);
+            absolute += '\\';
+            absolute += path;
+            FilepathNormalize(absolute, false);
+            path = absolute.c_str();
+        }
+
+        if (!StringStartsWith(path, CLEO_GetGameDirectory(), false) &&
+            !StringStartsWith(path, CLEO_GetUserDirectory(), false))
+        {
+            return false;
+        }
+
+        return true;
     }
 
     static bool IsObjectHandleValid(DWORD handle)
@@ -604,7 +661,7 @@ namespace CLEO
     #define OPCODE_READ_PARAMS_FORMATTED(_format, _varName) char _varName[2 * MAX_STR_LEN + 1]; char* _varName##Ok = CLEO_ReadParamsFormatted(thread, _format, _varName, sizeof(_varName));
 
     #define OPCODE_READ_PARAM_FILEPATH(_varName) char _buff_##_varName[512]; const char* ##_varName = _readParamText(thread, _buff_##_varName, 512); if(##_varName != nullptr) ##_varName = _buff_##_varName; if(_paramWasString()) CLEO_ResolvePath(thread, _buff_##_varName, 512); else return OpcodeResult::OR_INTERRUPT; \
-        if(!IsFilepathSafe(thread, ##_varName)) { SHOW_ERROR("Forbidden file path '%s' outside game directories in script %s \nScript suspended.", ##_varName, ScriptInfoStr(thread).c_str()); return thread->Suspend(); }
+        if(!FilepathIsSafe(thread, ##_varName)) { SHOW_ERROR("Forbidden file path '%s' outside game directories in script %s \nScript suspended.", ##_varName, ScriptInfoStr(thread).c_str()); return thread->Suspend(); }
 
     #define OPCODE_READ_PARAM_PTR() _readParam(thread).pParam; \
         if (!_paramWasInt()) { SHOW_ERROR("Input argument %s expected to be integer, got %s in script %s\nScript suspended.", GetParamInfo().c_str(), CLEO::ToKindStr(_lastParamType, _lastParamArrayType), CLEO::ScriptInfoStr(thread).c_str()); return thread->Suspend(); } \

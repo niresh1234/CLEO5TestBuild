@@ -19,25 +19,6 @@
 #include <set>
 #include <cstdint>
 
-
-// global constant paths. Initialize before anything else
-namespace FS = std::filesystem;
-
-static std::string GetApplicationDirectory()
-{
-    char buffer[512];
-    GetModuleFileNameA(NULL, buffer, sizeof(buffer) - 1); // game exe absolute path
-    return FS::path(buffer).parent_path().string();
-}
-static const std::string Filepath_Root = GetApplicationDirectory();
-
-//static const std::string Filepath_Cleo = FS::path(Filepath_Root).append("cleo").string(); // absolute path
-static const std::string Filepath_Cleo = "cleo"; // relative path - allow mod loaders to affect it
-
-static const std::string Filepath_Config = FS::path(Filepath_Cleo).append(".cleo_config.ini").string();
-static const std::string Filepath_Log = FS::path(Filepath_Cleo).append(".cleo.log").string();
-
-
 #include <game_sa/CPools.h>
 #include <game_sa/CMenuManager.h>
 #include <game_sa/CText.h>
@@ -45,10 +26,50 @@ static const std::string Filepath_Log = FS::path(Filepath_Cleo).append(".cleo.lo
 #include <game_sa/cHandlingDataMgr.h>
 #include <game_sa/CPlayerPed.h>
 #include <game_sa/CRadar.h>
+#include <game_sa/CTheScripts.h>
 
 #include "..\cleo_sdk\CLEO.h"
 #include "..\cleo_sdk\CLEO_Utils.h"
-#include "CTheScripts.h"
+
+// global constant paths. Initialize before anything else
+namespace FS = std::filesystem;
+
+static std::string GetGameDirectory() // already stored in Filepath_Game
+{
+    static const auto GTA_GetCWD = (char* (__cdecl*)(char*, int))0x00836E91; // SA 1.0 US ingame function
+
+    std::string path;
+
+    path.resize(MAX_PATH);
+    GTA_GetCWD(path.data(), path.size()); // assume work dir is game location when initialized
+    path.resize(strlen(path.data()));
+
+    CLEO::FilepathNormalize(path);
+
+    return std::move(path);
+}
+
+static std::string GetUserDirectory() // already stored in Filepath_User
+{
+    static const char* GTA_User_Dir_Path = (char*)0x00C92368; // SA 1.0 US
+    static const auto GTA_InitUserDirectories = (char* (__cdecl*)())0x00744FB0; // SA 1.0 US
+
+    if (strlen(GTA_User_Dir_Path) == 0)
+    {
+        GTA_InitUserDirectories();
+    }
+
+    std::string path = GTA_User_Dir_Path;
+    CLEO::FilepathNormalize(path);
+
+    return std::move(path);
+}
+
+inline const std::string Filepath_Game = GetGameDirectory();
+inline const std::string Filepath_User = GetUserDirectory();
+inline const std::string Filepath_Cleo = Filepath_Game + "\\cleo";
+inline const std::string Filepath_Config = Filepath_Cleo + "\\.cleo_config.ini";
+inline const std::string Filepath_Log = Filepath_Cleo + "\\.cleo.log";
 
 #define NUM_SCAN_ENTITIES 16
 
