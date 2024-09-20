@@ -6,7 +6,7 @@ namespace CLEO
     class C3DAudioStream : public CAudioStream
     {
     public:
-        const float Volume_3D_Adjust = 0.333f; // to match other ingame sound sources
+        const float Volume_3D_Adjust = 0.333f; // to match other ingame 3d sounds
 
         C3DAudioStream(const char* filepath);
 
@@ -21,7 +21,7 @@ namespace CLEO
         CEntity* host = nullptr;
         CVector position = { 0.0f, 0.0f, 0.0f };
         bool placed = false; // position calcualted?
-        float sourceRadius = 10.0f; // same as in play_mission_audio opcode
+        float sourceRadius = 5.0f;
 
         C3DAudioStream(const C3DAudioStream&) = delete; // no copying!
         void UpdatePosition();

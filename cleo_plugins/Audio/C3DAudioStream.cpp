@@ -1,6 +1,7 @@
 #include "C3DAudioStream.h"
 #include "CSoundSystem.h"
 #include "CLEO_Utils.h"
+#include "CCamera.h"
 
 using namespace CLEO;
 
@@ -58,38 +59,32 @@ float C3DAudioStream::CalculateVolume()
     // calculate distance based volume
     float distance = CSoundSystem::GetDistance(&position);
     distance = max(distance - sourceRadius, 0.0f);
-    distance /= max(GetParam(StreamParam::Volume), 0.0001f); // louder sounds reach further
+    distance /= max(powf(sourceRadius, 0.333f), 0.001f); // bigger sources reach further
+    float decay = 1.0f / (1.0f + 0.32f * distance); // hand fitted to match game's decay curve
 
-    // hand fitted to match game's decay curve
-    float decay = 1.0f / (1.0f + 0.32f * distance);
-    decay = max(decay - 0.03948f, 0.0f);
+    float volume = GetParam(Volume) * Volume_3D_Adjust * decay;
+    volume = max(volume - 0.025f, 0.0f); // BASS tends to make even very low volumes still well audible. Fight it with small offset
 
-    return CAudioStream::CalculateVolume() * Volume_3D_Adjust * decay;
+    // non 3d world, 2d "post effect"
+    volume *= CSoundSystem::GetMasterVolume(type);
+
+    return volume;
 }
 
 void C3DAudioStream::UpdatePosition()
 {
-    if (host == nullptr) 
-    {
-        if (!placed && !CSoundSystem::skipFrame)
-        {
-            const auto direction = CVector(0.0f, 0.0f, 1.0f); // up TODO: allow to be set
-            const auto velocity = CVector(0.0f, 0.0f, 0.0f);
+    CVector direction;
+    CVector velocity;
 
-            BASS_ChannelSet3DPosition(streamInternal, 
-                &toBass(position),
-                &toBass(direction),
-                &toBass(velocity));
-            placed = true;
-        }
-    }
-    else // attached to some entity
+    if (host != nullptr)  // attached to some entity
     {
         // TODO: relative offset, attaching to bones/car components
-        CVector velocity = position; // store previous
+        velocity = position; // store previous
         position = host->GetPosition(); // get new
 
-        if (!CSoundSystem::skipFrame)
+        direction = host->GetForward();
+
+        if (!CSoundSystem::skipFrame && placed) // prev pos available for veloctiy calculations
         {
             velocity = position - velocity; // curr - prev
             velocity /= CSoundSystem::timeStep; // meters peer second
@@ -98,13 +93,46 @@ void C3DAudioStream::UpdatePosition()
             velocity.x = sqrtf(abs(velocity.x)) * (velocity.x > 0.0f ? 1.0f : -1.0f);
             velocity.y = sqrtf(abs(velocity.y)) * (velocity.y > 0.0f ? 1.0f : -1.0f);
             velocity.z = sqrtf(abs(velocity.z)) * (velocity.z > 0.0f ? 1.0f : -1.0f);
-
-            BASS_ChannelSet3DPosition(streamInternal, 
-                &toBass(position),
-                &toBass(host->GetForward()),
-                &toBass(velocity));
-            placed = true;
         }
+    }
+    else
+    {
+        direction = { 0.0f, 0.0f, 1.0f, }; // up
+        velocity = { 0.0f, 0.0f, 0.0f, };
+    }
+
+    // apply
+    if (!CSoundSystem::skipFrame)
+    {
+        if (placed)
+        {
+            float outsideness = min(CSoundSystem::GetDistance(&position) / (2.0f * sourceRadius), 1.0f); // factor
+            if (outsideness >= 1.0f)
+            {
+                BASS_ChannelSet3DPosition(streamInternal,
+                    &toBass(position),
+                    &toBass(direction),
+                    &toBass(velocity));
+            }
+            else // listener inside sound soruce, no lef-right paning or Doppler effects then
+            {
+                // blending curve
+                outsideness = max(2.0f * outsideness - 1.0f, 0.0f); // blending curve
+                outsideness *= outsideness;
+
+                auto fakePos = CSoundSystem::position + CSoundSystem::forward; // 1 meter in front of the listener, dead center
+                fakePos = position * outsideness + fakePos * (1.0f - outsideness); // blend
+
+                auto fakeVel = velocity * outsideness + CSoundSystem::velocity * (1.0f - outsideness); // blend
+
+                BASS_ChannelSet3DPosition(streamInternal,
+                    &toBass(fakePos),
+                    &toBass(direction),
+                    &toBass(fakeVel));
+            }
+        }
+
+        placed = true;
     }
 }
 

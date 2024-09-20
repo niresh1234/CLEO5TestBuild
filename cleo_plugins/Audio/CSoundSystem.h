@@ -29,11 +29,12 @@ namespace CLEO
         static bool CSoundSystem::allowNetworkSources;
 
         static CVector position;
+        static CVector forward;
+        static CVector up;
+        static CVector velocity;
         static bool skipFrame; // do not apply changes during this frame
         static float timeStep; // delta time for current frame
         static float masterSpeed; // game simulation speed
-        static float masterVolumeSfx;
-        static float masterVolumeMusic;
 
     public:
         static eStreamType LegacyModeDefaultStreamType;
@@ -55,6 +56,7 @@ namespace CLEO
         void Process();
 
         static float GetDistance(const CVector* position); // distance from coords to the camera
+        static float GetMasterVolume(eStreamType type);
     };
 
     // convert GTA to BASS coordinate system

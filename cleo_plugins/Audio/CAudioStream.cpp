@@ -176,17 +176,7 @@ void CAudioStream::ResetParams()
 
 float CAudioStream::CalculateVolume()
 {
-    float masterVolume;
-    switch(type)
-    {
-        case SoundEffect: masterVolume = CSoundSystem::masterVolumeSfx; break;
-        case Music: masterVolume = CSoundSystem::masterVolumeMusic; break;
-        default: masterVolume = 1.0f; break;
-    }
-
-    float fadeVolume = 1.0f - TheCamera.m_fFadeAlpha / 255.0f; // TODO: handle TheCamera.m_bIgnoreFadingStuffForMusic if neccessary
-
-    return GetParam(Volume) * fadeVolume * masterVolume;
+    return GetParam(Volume) * CSoundSystem::GetMasterVolume(type);
 }
 
 void CAudioStream::ProcessTransitions(bool instant)

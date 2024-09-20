@@ -11,12 +11,15 @@ namespace CLEO
 {
     bool CSoundSystem::useFloatAudio = false;
     bool CSoundSystem::allowNetworkSources = true;
+
     CVector CSoundSystem::position(0.0, 0.0, 0.0);
+    CVector CSoundSystem::forward(0.0, 1.0, 0.0);
+    CVector CSoundSystem::up(0.0, 0.0, 1.0);
+    CVector CSoundSystem::velocity(0.0, 0.0, 0.0);
     bool CSoundSystem::skipFrame = true;
     float CSoundSystem::timeStep = 0.02f;
     float CSoundSystem::masterSpeed = 1.0f;
-    float CSoundSystem::masterVolumeSfx = 1.0f;
-    float CSoundSystem::masterVolumeMusic = 1.0f;
+
     eStreamType CSoundSystem::LegacyModeDefaultStreamType = eStreamType::None;
 
     void EnumerateBassDevices(int& total, int& enabled, int& default_device)
@@ -205,10 +208,8 @@ namespace CLEO
             skipFrame = TheCamera.m_bJust_Switched || TheCamera.m_bCameraJustRestored || CPad::GetPad(0)->JustOutOfFrontEnd; // avoid camera change/jump cut velocity glitches
             timeStep = (float)(CTimer::m_snTimeInMillisecondsNonClipped - CTimer::m_snPreviousTimeInMillisecondsNonClipped) / 1000.0f; // time delta in seconds
             masterSpeed = CTimer::ms_fTimeScale;
-            masterVolumeSfx = AEAudioHardware.m_fEffectMasterScalingFactor * AEAudioHardware.m_fEffectsFaderScalingFactor * 0.5f; // fit to game's sfx volume
-            masterVolumeMusic = AEAudioHardware.m_fMusicMasterScalingFactor * AEAudioHardware.m_fMusicFaderScalingFactor * 0.5f;
 
-            CVector velocity = position; // store previous
+            CVector prevPos = position;
             position = TheCamera.GetPosition(); // get new
 
             if (!skipFrame)
@@ -216,7 +217,7 @@ namespace CLEO
                 if (paused) Resume();
 
                 // camera velocity
-                velocity = position - velocity; // curr - prev
+                velocity = position - prevPos;
                 velocity /= timeStep; // meters peer second
 
                 // make Doppler effect less dramatic
@@ -224,14 +225,14 @@ namespace CLEO
                 velocity.y = sqrtf(abs(velocity.y)) * (velocity.y > 0.0f ? 1.0f : -1.0f);
                 velocity.z = sqrtf(abs(velocity.z)) * (velocity.z > 0.0f ? 1.0f : -1.0f);
 
-                auto forward = TheCamera.GetForward();
-                auto top = TheCamera.GetUp();
+                forward = TheCamera.GetForward();
+                up = TheCamera.GetUp();
 
                 BASS_Set3DPosition(
                     &toBass(position),
                     &toBass(velocity),
                     &toBass(forward),
-                    &toBass(top)
+                    &toBass(up)
                 );
             }
 
@@ -248,5 +249,32 @@ namespace CLEO
         auto v = CSoundSystem::position;
         v -= *position;
         return v.Magnitude();
+    }
+
+    float CSoundSystem::GetMasterVolume(eStreamType type)
+    {
+        // global volume settings
+        float volume;
+        switch (type)
+        {
+            case SoundEffect: 
+                volume = AEAudioHardware.m_fEffectMasterScalingFactor* AEAudioHardware.m_fEffectsFaderScalingFactor * 0.5f; // fitted to game's sfx volume
+                break;
+
+            case Music: 
+                volume = AEAudioHardware.m_fMusicMasterScalingFactor * AEAudioHardware.m_fMusicFaderScalingFactor * 0.5f;
+                break;
+
+            default: 
+                volume = 1.0f; 
+                break;
+        }
+
+        // screen fading
+        volume = 1.0f - TheCamera.m_fFadeAlpha / 255.0f; // TODO: handle TheCamera.m_bIgnoreFadingStuffForMusic if neccessary
+
+        // TODO: muscic volume lowering when in cutscenes, when mission or ped speach is acttive etc.
+
+        return volume;
     }
 }
