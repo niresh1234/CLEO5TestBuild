@@ -271,9 +271,12 @@ namespace CLEO
         }
 
         // screen fading
-        volume = 1.0f - TheCamera.m_fFadeAlpha / 255.0f; // TODO: handle TheCamera.m_bIgnoreFadingStuffForMusic if neccessary
+        if (!TheCamera.m_bIgnoreFadingStuffForMusic) // it actually applies to all sounds
+        {
+            volume *= 1.0f - TheCamera.m_fFadeAlpha / 255.0f;
+        }
 
-        // TODO: muscic volume lowering when in cutscenes, when mission or ped speach is acttive etc.
+        // TODO: music volume lowering when in cutscenes, when mission or ped speach is active etc.
 
         return volume;
     }
