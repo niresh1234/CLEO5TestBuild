@@ -257,16 +257,16 @@ namespace CLEO
         float volume;
         switch (type)
         {
-            case SoundEffect: 
+            case SoundEffect:
                 volume = AEAudioHardware.m_fEffectMasterScalingFactor* AEAudioHardware.m_fEffectsFaderScalingFactor * 0.5f; // fitted to game's sfx volume
                 break;
 
-            case Music: 
+            case Music:
                 volume = AEAudioHardware.m_fMusicMasterScalingFactor * AEAudioHardware.m_fMusicFaderScalingFactor * 0.5f;
                 break;
 
-            default: 
-                volume = 1.0f; 
+            default:
+                volume = 1.0f;
                 break;
         }
 
@@ -276,7 +276,11 @@ namespace CLEO
             volume *= 1.0f - TheCamera.m_fFadeAlpha / 255.0f;
         }
 
-        // TODO: music volume lowering when in cutscenes, when mission or ped speach is active etc.
+        // music volume lowering in cutscenes, when characters talk, mission sounds are played etc.
+        if (type == Music)
+        {
+            if (TheCamera.m_bWideScreenOn) volume /= 3.0f;
+        }
 
         return volume;
     }
