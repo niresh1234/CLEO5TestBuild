@@ -76,6 +76,8 @@ void C3DAudioStream::UpdatePosition()
     CVector direction;
     CVector velocity;
 
+    if (CSoundSystem::skipFrame) placed = false; // needs recalculation
+
     if (host != nullptr)  // attached to some entity
     {
         // TODO: relative offset, attaching to bones/car components
@@ -84,7 +86,7 @@ void C3DAudioStream::UpdatePosition()
 
         direction = host->GetForward();
 
-        if (!CSoundSystem::skipFrame && placed) // prev pos available for veloctiy calculations
+        if (!CSoundSystem::skipFrame)
         {
             velocity = position - velocity; // curr - prev
             velocity /= CSoundSystem::timeStep; // meters peer second
@@ -104,32 +106,29 @@ void C3DAudioStream::UpdatePosition()
     // apply
     if (!CSoundSystem::skipFrame)
     {
-        if (placed)
+        float outsideness = min(CSoundSystem::GetDistance(&position) / (2.0f * sourceRadius), 1.0f); // factor
+        if (outsideness >= 1.0f)
         {
-            float outsideness = min(CSoundSystem::GetDistance(&position) / (2.0f * sourceRadius), 1.0f); // factor
-            if (outsideness >= 1.0f)
-            {
-                BASS_ChannelSet3DPosition(streamInternal,
-                    &toBass(position),
-                    &toBass(direction),
-                    &toBass(velocity));
-            }
-            else // listener inside sound soruce, no lef-right paning or Doppler effects then
-            {
-                // blending curve
-                outsideness = max(2.0f * outsideness - 1.0f, 0.0f); // blending curve
-                outsideness *= outsideness;
+            BASS_ChannelSet3DPosition(streamInternal,
+                &toBass(position),
+                &toBass(direction),
+                &toBass(velocity));
+        }
+        else // listener inside sound soruce, no lef-right panning or Doppler effects then
+        {
+            // blending curve
+            outsideness = max(2.0f * outsideness - 1.0f, 0.0f); // blending curve
+            outsideness *= outsideness;
 
-                auto fakePos = CSoundSystem::position + CSoundSystem::forward; // 1 meter in front of the listener, dead center
-                fakePos = position * outsideness + fakePos * (1.0f - outsideness); // blend
+            auto fakePos = CSoundSystem::position + CSoundSystem::forward; // 1 meter in front of the listener, dead center
+            fakePos = position * outsideness + fakePos * (1.0f - outsideness); // blend
 
-                auto fakeVel = velocity * outsideness + CSoundSystem::velocity * (1.0f - outsideness); // blend
+            auto fakeVel = velocity * outsideness + CSoundSystem::velocity * (1.0f - outsideness); // blend
 
-                BASS_ChannelSet3DPosition(streamInternal,
-                    &toBass(fakePos),
-                    &toBass(direction),
-                    &toBass(fakeVel));
-            }
+            BASS_ChannelSet3DPosition(streamInternal,
+                &toBass(fakePos),
+                &toBass(direction),
+                &toBass(fakeVel));
         }
 
         placed = true;
