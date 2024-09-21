@@ -210,6 +210,8 @@ void CAudioStream::ProcessTransitions(bool instant)
 
 void CAudioStream::ApplyParams()
 {
+    if (CSoundSystem::skipFrame) return;
+
     // volume
     float volume = CalculateVolume();
     BASS_ChannelSetAttribute(streamInternal, BASS_ATTRIB_VOL, volume);

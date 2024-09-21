@@ -116,14 +116,14 @@ void C3DAudioStream::UpdatePosition()
         }
         else // listener inside sound soruce, no lef-right panning or Doppler effects then
         {
-            // blending curve
-            outsideness = max(2.0f * outsideness - 1.0f, 0.0f); // blending curve
+            auto fakeVel = velocity * outsideness + CSoundSystem::velocity * (1.0f - outsideness); // blend
+
+            // modify blending curve for stereo panning
+            outsideness = max(2.0f * outsideness - 1.0f, 0.0f); 
             outsideness *= outsideness;
 
             auto fakePos = CSoundSystem::position + CSoundSystem::forward; // 1 meter in front of the listener, dead center
             fakePos = position * outsideness + fakePos * (1.0f - outsideness); // blend
-
-            auto fakeVel = velocity * outsideness + CSoundSystem::velocity * (1.0f - outsideness); // blend
 
             BASS_ChannelSet3DPosition(streamInternal,
                 &toBass(fakePos),
