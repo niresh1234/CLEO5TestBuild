@@ -7,11 +7,6 @@ namespace CLEO
     CCleoInstance CleoInstance;
     CCleoInstance& GetInstance() { return CleoInstance; }
 
-    inline CCleoInstance::CCleoInstance()
-    {
-        m_bStarted = false;
-    }
-
     inline CCleoInstance::~CCleoInstance()
     {
         Stop();
@@ -111,52 +106,79 @@ namespace CLEO
         _asm jmp oriFunc
     }
 
-    void CCleoInstance::Start()
+    void __declspec(naked) CCleoInstance::OnDebugDisplayTextBuffer()
     {
-        if (m_bStarted) return; // already started
-        m_bStarted = true;
+        GetInstance().CallCallbacks(eCallbackId::DrawingFinished); // execute registered callbacks
+        static DWORD oriFunc;
+        oriFunc = (DWORD)(GetInstance().DebugDisplayTextBuffer);
+        if (oriFunc != (DWORD)nullptr)
+            _asm jmp oriFunc
+        else
+            _asm ret
+    }
 
-        FS::create_directory(Filepath_Cleo);
-        FS::create_directory(Filepath_Cleo + "\\cleo_modules");
-        FS::create_directory(Filepath_Cleo + "\\cleo_plugins");
-        FS::create_directory(Filepath_Cleo + "\\cleo_saves");
+    void CCleoInstance::Start(InitStage stage)
+    {
+        if (stage > InitStage::Done) return; // invalid argument
 
-        OpcodeInfoDb.Load((Filepath_Cleo + "\\.config\\sa.json").c_str());
+        auto nextStage = InitStage(m_initStage + 1);
+        if (stage != nextStage) return;
 
-        CodeInjector.OpenReadWriteAccess(); // must do this earlier to ensure plugins write access on init
-        GameMenu.Inject(CodeInjector);
-        DmaFix.Inject(CodeInjector);
-        OpcodeSystem.Inject(CodeInjector);
-        ScriptEngine.Inject(CodeInjector);
+        if (stage == InitStage::Initial)
+        {
+            TRACE("CLEO initialization: Phase 1");
 
-        CodeInjector.ReplaceFunction(OnCreateMainWnd, VersionManager.TranslateMemoryAddress(MA_CALL_CREATE_MAIN_WINDOW), &CreateMainWnd_Orig);
+            FS::create_directory(Filepath_Cleo);
+            FS::create_directory(Filepath_Cleo + "\\cleo_modules");
+            FS::create_directory(Filepath_Cleo + "\\cleo_plugins");
+            FS::create_directory(Filepath_Cleo + "\\cleo_saves");
 
-        CodeInjector.ReplaceFunction(OnUpdateGameLogics, VersionManager.TranslateMemoryAddress(MA_CALL_UPDATE_GAME_LOGICS), &UpdateGameLogics);
+            OpcodeInfoDb.Load((Filepath_Cleo + "\\.config\\sa.json").c_str());
 
-        CodeInjector.ReplaceFunction(OnScmInit1, VersionManager.TranslateMemoryAddress(MA_CALL_INIT_SCM1), &ScmInit1_Orig);
-        CodeInjector.ReplaceFunction(OnScmInit2, VersionManager.TranslateMemoryAddress(MA_CALL_INIT_SCM2), &ScmInit2_Orig);
-        CodeInjector.ReplaceFunction(OnScmInit3, VersionManager.TranslateMemoryAddress(MA_CALL_INIT_SCM3), &ScmInit3_Orig);
+            CodeInjector.OpenReadWriteAccess(); // must do this earlier to ensure plugins write access on init
+            GameMenu.Inject(CodeInjector);
+            DmaFix.Inject(CodeInjector);
+            OpcodeSystem.Inject(CodeInjector);
+            ScriptEngine.Inject(CodeInjector);
 
-        CodeInjector.ReplaceFunction(OnGameShutdown, VersionManager.TranslateMemoryAddress(MA_CALL_GAME_SHUTDOWN), &GameShutdown);
+            CodeInjector.ReplaceFunction(OnCreateMainWnd, VersionManager.TranslateMemoryAddress(MA_CALL_CREATE_MAIN_WINDOW), &CreateMainWnd_Orig);
 
-        CodeInjector.ReplaceFunction(OnGameRestart1, VersionManager.TranslateMemoryAddress(MA_CALL_GAME_RESTART_1), &GameRestart1);
-        CodeInjector.ReplaceFunction(OnGameRestart2, VersionManager.TranslateMemoryAddress(MA_CALL_GAME_RESTART_2), &GameRestart2);
-        CodeInjector.ReplaceFunction(OnGameRestart3, VersionManager.TranslateMemoryAddress(MA_CALL_GAME_RESTART_3), &GameRestart3);
+            CodeInjector.ReplaceFunction(OnUpdateGameLogics, VersionManager.TranslateMemoryAddress(MA_CALL_UPDATE_GAME_LOGICS), &UpdateGameLogics);
 
-        CodeInjector.ReplaceFunction(OnDrawingFinished, 0x00734640); // nullsub_63 - originally something like renderDebugStuff?
+            CodeInjector.ReplaceFunction(OnScmInit1, VersionManager.TranslateMemoryAddress(MA_CALL_INIT_SCM1), &ScmInit1_Orig);
+            CodeInjector.ReplaceFunction(OnScmInit2, VersionManager.TranslateMemoryAddress(MA_CALL_INIT_SCM2), &ScmInit2_Orig);
+            CodeInjector.ReplaceFunction(OnScmInit3, VersionManager.TranslateMemoryAddress(MA_CALL_INIT_SCM3), &ScmInit3_Orig);
 
-        OpcodeSystem.Init();
-        PluginSystem.LoadPlugins();
+            CodeInjector.ReplaceFunction(OnGameShutdown, VersionManager.TranslateMemoryAddress(MA_CALL_GAME_SHUTDOWN), &GameShutdown);
+
+            CodeInjector.ReplaceFunction(OnGameRestart1, VersionManager.TranslateMemoryAddress(MA_CALL_GAME_RESTART_1), &GameRestart1);
+            CodeInjector.ReplaceFunction(OnGameRestart2, VersionManager.TranslateMemoryAddress(MA_CALL_GAME_RESTART_2), &GameRestart2);
+            CodeInjector.ReplaceFunction(OnGameRestart3, VersionManager.TranslateMemoryAddress(MA_CALL_GAME_RESTART_3), &GameRestart3);
+
+            OpcodeSystem.Init();
+            PluginSystem.LoadPlugins();
+        }
+        
+        // delayed until menu background drawing
+        if (stage == InitStage::OnDraw)
+        {
+            TRACE("CLEO initialization: Phase 2");
+
+            CodeInjector.ReplaceJump(OnDebugDisplayTextBuffer, VersionManager.TranslateMemoryAddress(MA_DEBUG_DISPLAY_TEXT_BUFFER), &DebugDisplayTextBuffer);
+        }
+
+        m_initStage = stage;
     }
 
     void CCleoInstance::Stop()
     {
-        if (!m_bStarted) return;
-        m_bStarted = false;
+        if (m_initStage >= InitStage::Initial)
+        {
+            ScriptEngine.GameEnd();
+            PluginSystem.UnloadPlugins();
+        }
 
-        ScriptEngine.GameEnd();
-
-        PluginSystem.UnloadPlugins();
+        m_initStage = InitStage::None;
     }
 
     void CCleoInstance::GameBegin()
@@ -228,11 +250,6 @@ namespace CLEO
     void WINAPI CLEO_UnregisterCallback(eCallbackId id, void* func)
     {
         GetInstance().RemoveCallback(id, func);
-    }
-
-    void __cdecl CCleoInstance::OnDrawingFinished()
-    {
-        GetInstance().CallCallbacks(eCallbackId::DrawingFinished); // execute registered callbacks
     }
 
     DWORD WINAPI CLEO_GetInternalAudioStream(CLEO::CRunningScript* thread, DWORD stream) // arg CAudioStream *

@@ -17,12 +17,16 @@ namespace CLEO
 {
     class CCleoInstance
     {
-        bool m_bStarted;
-        bool m_bGameInProgress;
-        std::map<eCallbackId, std::set<void*>> m_callbacks;
-
     public:
-        // order here defines init and deinit and order!
+        enum InitStage : size_t
+        {
+            None,
+            Initial,
+            OnDraw,
+            Done = OnDraw
+        };
+
+        // order here defines init and deinit order!
         CDmaFix					DmaFix;
         CGameMenu				GameMenu;
         CCodeInjector			CodeInjector;
@@ -35,16 +39,16 @@ namespace CLEO
 
         int saveSlot = -1; // -1 if not loaded from save
 
-        CCleoInstance();
+        CCleoInstance() = default;
         virtual ~CCleoInstance();
 
-        void Start();
+        void Start(InitStage stage);
         void Stop();
 
         void GameBegin();
         void GameEnd();
 
-        bool IsStarted() const { return m_bStarted; }
+        bool IsStarted() const { return m_initStage != InitStage::None; }
 
         void AddCallback(eCallbackId id, void* func);
         void RemoveCallback(eCallbackId id, void* func);
@@ -75,15 +79,24 @@ namespace CLEO
 
         // call for Game::Shutdown
         void(__cdecl* GameShutdown)() = nullptr;
-        static void __cdecl OnGameShutdown();
+        static void OnGameShutdown();
 
         // calls for Game::ShutDownForRestart
         void(__cdecl* GameRestart1)() = nullptr;
         void(__cdecl* GameRestart2)() = nullptr;
         void(__cdecl* GameRestart3)() = nullptr;
-        static void __cdecl OnGameRestart1();
-        static void __cdecl OnGameRestart2();
-        static void __cdecl OnGameRestart3();
+        static void OnGameRestart1();
+        static void OnGameRestart2();
+        static void OnGameRestart3();
+
+        // empty function called after everything else is drawn
+        memory_pointer DebugDisplayTextBuffer = nullptr;
+        static void OnDebugDisplayTextBuffer();
+
+    private:
+        InitStage m_initStage = InitStage::None;
+        bool m_bGameInProgress;
+        std::map<eCallbackId, std::set<void*>> m_callbacks;
     };
 
     CCleoInstance& GetInstance();

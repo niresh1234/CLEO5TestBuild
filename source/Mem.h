@@ -17,12 +17,29 @@ inline void MemCopy(U p, const T* v) { memcpy((void*)p, v, sizeof(T)); }
 template<typename T, typename U>
 inline void MemCopy(U p, const T* v, int n) { memcpy((void*)p, v, n); }
 
-// Write a jump to v to the address at p and copy the replaced call address to r
+// Write a jump to v to the address at p and copy the replaced jump address to r
 template<typename T, typename U>
 inline void MemJump(U p, const T v, T *r = nullptr)
 {
+    if (r != nullptr)
+    {
+        switch (MemRead<BYTE>(p))
+        {
+            case OP_JMP:
+                *r = (T)(DWORD(p) + 5 + MemRead<signed int>(p + 1));
+                break;
+
+            case OP_JMPSHORT:
+                *r = (T)(DWORD(p) + 2 + MemRead<signed char>(p + 1));
+                break;
+
+            default:
+                *r = (T)nullptr;
+                break;
+        }
+    }
+
     MemWrite<BYTE>(p++, OP_JMP);
-    if (r) *r = (T)(MemRead<DWORD>(p) + p + 4);
     MemWrite<DWORD>(p, ((DWORD)v - (DWORD)p) - 4);
 }
 
@@ -30,8 +47,15 @@ inline void MemJump(U p, const T v, T *r = nullptr)
 template<typename T, typename U>
 inline void MemCall(U p, const T v, T *r = nullptr)
 {
+    if (r != nullptr)
+    {
+        if (MemRead<BYTE>(p) == OP_CALL)
+            *r = (T)(DWORD(p) + 5 + MemRead<signed int>(p + 1));
+        else
+            *r = (T)nullptr;
+    }
+
     MemWrite<BYTE>(p++, OP_CALL);
-    if (r) *r = (T)(MemRead<DWORD>(p) + p + 4);
     MemWrite<DWORD>(p, (DWORD)v - (DWORD)p - 4);
 }
 
