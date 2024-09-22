@@ -56,19 +56,25 @@ float C3DAudioStream::CalculateVolume()
 {
     if (!placed) return 0.0f; // muted until position calculated
 
+    float volumeDb = 0.0; // default volume for game's mission audio
+
     // calculate distance based volume
     float distance = CSoundSystem::GetDistance(&position);
     distance = max(distance - sourceRadius, 0.0f);
-    distance /= max(powf(sourceRadius, 0.333f), 0.001f); // bigger sources reach further
-    float decay = 1.0f / (1.0f + 0.32f * distance); // hand fitted to match game's decay curve
+    //distance /= max(powf(sourceRadius, 0.333f), 0.001f); // bigger sources reach further
 
-    float volume = GetParam(Volume) * Volume_3D_Adjust * decay;
-    volume = max(volume - 0.025f, 0.0f); // BASS tends to make even very low volumes still well audible. Fight it with small offset
+    //float decay = 1.0f / (1.0f + 0.32f * distance); // hand fitted to match game's decay curve
+    auto decay = (float)CAEAudioEnvironment__GetDistanceAttenuation(distance);
+    //decay = dbToLinear(decay);
 
-    // non 3d world, 2d "post effect"
-    volume *= CSoundSystem::GetMasterVolume(type);
+    //float volume = GetParam(Volume) * Volume_3D_Adjust * decay;
+    //volume = max(volume - 0.025f, 0.0f); // BASS tends to make even very low volumes still well audible. Fight it with small offset
 
-    return volume;
+    volumeDb += decay;
+
+    float volume = dbToLinear(volumeDb);
+
+    return volume * Volume_3D_Adjust * CSoundSystem::GetMasterVolume(type);
 }
 
 void C3DAudioStream::UpdatePosition()

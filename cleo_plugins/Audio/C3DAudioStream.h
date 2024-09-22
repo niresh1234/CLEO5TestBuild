@@ -6,7 +6,7 @@ namespace CLEO
     class C3DAudioStream : public CAudioStream
     {
     public:
-        const float Volume_3D_Adjust = 0.333f; // to match other ingame 3d sounds
+        const float Volume_3D_Adjust = 0.25f; // to match other ingame 3d sounds
 
         C3DAudioStream(const char* filepath);
 

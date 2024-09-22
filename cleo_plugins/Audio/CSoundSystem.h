@@ -1,4 +1,5 @@
 #pragma once
+#include "CLEO_Utils.h"
 #include "bass.h"
 #include "CVector.h"
 #include <set>
@@ -14,6 +15,10 @@ namespace CLEO
         SoundEffect,
         Music,
     };
+
+    // functions inside game executable
+    static long double(__cdecl* CAEAudioUtility__AudioLog10)(float value) = memory_pointer(0x004D9E50);
+    static double(__cdecl* CAEAudioEnvironment__GetDistanceAttenuation)(float distance) = memory_pointer(0x004D7F20);
 
     class CSoundSystem
     {
@@ -62,6 +67,9 @@ namespace CLEO
     // convert GTA to BASS coordinate system
     inline BASS_3DVECTOR toBass(const CVector& v) { return BASS_3DVECTOR(v.x, v.z, v.y); }
     inline BASS_3DVECTOR toBass(const CVector* v) { return toBass(*v); }
+
+    // convert Decibel gain (-100.0 - 0.0) to linear factor (0.0 - 1.0)
+    inline float dbToLinear(float value) { return powf(10.0f, value / 20.0f); }
     
     bool isNetworkSource(const char* path);
 }
