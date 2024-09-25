@@ -206,24 +206,28 @@ namespace CLEO
         {
             // update globals
             skipFrame = TheCamera.m_bJust_Switched || TheCamera.m_bCameraJustRestored || CPad::GetPad(0)->JustOutOfFrontEnd; // avoid camera change/jump cut velocity glitches
-            timeStep = (float)(CTimer::m_snTimeInMillisecondsNonClipped - CTimer::m_snPreviousTimeInMillisecondsNonClipped) / 1000.0f; // time delta in seconds
+            timeStep = CTimer::ms_fTimeStep * 0.02f; // time delta in seconds
             masterSpeed = CTimer::ms_fTimeScale;
 
             CVector prevPos = position;
             position = TheCamera.GetPosition(); // get new
 
+            // new camera velocity
+            if (!skipFrame)
+            {
+                CVector vel = position - prevPos;
+                vel /= timeStep; // meters peer second
+
+                // averaging to smooth artifact caused by GTA's janky mouse camera control
+                velocity += velocity + vel;
+                velocity /= 3;
+            }
+            else
+                velocity = {};
+
             if (!skipFrame)
             {
                 if (paused) Resume();
-
-                // camera velocity
-                velocity = position - prevPos;
-                velocity /= timeStep; // meters peer second
-
-                // make Doppler effect less dramatic
-                velocity.x = sqrtf(abs(velocity.x)) * (velocity.x > 0.0f ? 1.0f : -1.0f);
-                velocity.y = sqrtf(abs(velocity.y)) * (velocity.y > 0.0f ? 1.0f : -1.0f);
-                velocity.z = sqrtf(abs(velocity.z)) * (velocity.z > 0.0f ? 1.0f : -1.0f);
 
                 forward = TheCamera.GetForward();
                 up = TheCamera.GetUp();

@@ -25,6 +25,7 @@ C3DAudioStream::C3DAudioStream(const char* filepath) : CAudioStream()
 
     BASS_ChannelGetAttribute(streamInternal, BASS_ATTRIB_FREQ, &rate);
     BASS_ChannelSet3DAttributes(streamInternal, BASS_3DMODE_NORMAL, -1.0f, -1.0f, -1, -1, -1.0f);
+    BASS_ChannelSetAttribute(streamInternal, BASS_ATTRIB_VOL, 0.0f); // muted until processed
     ok = true;
 }
 
@@ -96,11 +97,6 @@ void C3DAudioStream::UpdatePosition()
         {
             velocity = position - velocity; // curr - prev
             velocity /= CSoundSystem::timeStep; // meters peer second
-
-            // make Doppler effect less dramatic
-            velocity.x = sqrtf(abs(velocity.x)) * (velocity.x > 0.0f ? 1.0f : -1.0f);
-            velocity.y = sqrtf(abs(velocity.y)) * (velocity.y > 0.0f ? 1.0f : -1.0f);
-            velocity.z = sqrtf(abs(velocity.z)) * (velocity.z > 0.0f ? 1.0f : -1.0f);
         }
     }
     else
