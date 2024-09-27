@@ -1,5 +1,6 @@
 #include "CLEO.h"
 #include "CLEO_Utils.h"
+#include "AntiHacks.h"
 #include "plugin.h"
 #include "CTheScripts.h"
 #include <filesystem>
@@ -159,29 +160,30 @@ public:
         }
 
         SCRIPT_VAR* arguments_end = arguments + numArg;
-        numPop *= 4; // bytes peer argument
-        DWORD result;
+        numPop *= 4; // bytes peer argument        
+        DWORD result = 0;
         int oriSp, postSp; // stack validation
-        _asm
         {
+            _asm
+            {
             mov oriSp, esp
 
-            // transfer args to stack
-            lea ecx, arguments
-            call_func_loop :
-            cmp ecx, arguments_end
-                jae call_func_loop_end
-                push[ecx]
-                add ecx, 0x4
-                jmp call_func_loop
-                call_func_loop_end :
+                // transfer args to stack
+                lea ecx, arguments
+                call_func_loop :
+                cmp ecx, arguments_end
+                    jae call_func_loop_end
+                    push[ecx]
+                    add ecx, 0x4
+                    jmp call_func_loop
+                    call_func_loop_end :
 
-            // call function
-            mov ecx, obj
-                xor eax, eax
-                call func
-                mov result, eax // get result
-                add esp, numPop // cleanup stack
+                // call function
+                mov ecx, obj
+                    xor eax, eax
+                    call func
+                    mov result, eax // get result
+                    add esp, numPop // cleanup stack
 
             mov postSp, esp
         }
@@ -198,6 +200,7 @@ public:
             int requiredPop = (numPop + diff) / 4;
             SHOW_ERROR("Function call left stack position changed (%s%d). This usually happens when incorrect calling convention is used. \nArgument 'pop' value should have been %d in script %s \nScript suspended.", diff > 0 ? "+" : "", diff, requiredPop, CLEO::ScriptInfoStr(thread).c_str());
             return thread->Suspend();
+            }
         }
 
         if (returnArg)
@@ -397,10 +400,15 @@ public:
         HMODULE ptr = nullptr;
         
         // resolve absolute path and try load
-        char buff[MAX_PATH];
-        strncpy(buff, path, sizeof(buff));
-        CLEO_ResolvePath(thread, buff, sizeof(buff));
-        ptr = LoadLibrary(buff);
+        std::string buff = path;
+        buff.resize(MAX_PATH);
+        CLEO_ResolvePath(thread, buff.data(), buff.size());
+        buff.resize(strlen(buff.data()));
+
+        // ModLoader's hooks require relative paths in LoadLibrary to work
+        FilepathRemoveParent(buff, CLEO_GetGameDirectory());
+
+        ptr = LoadLibrary(buff.c_str());
 
         // in case of just filename let LoadLibrary resolve it itself
         if (ptr == nullptr && !std::filesystem::path(path).has_parent_path())
