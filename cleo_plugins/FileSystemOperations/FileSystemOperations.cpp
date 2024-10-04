@@ -4,6 +4,7 @@
 #include "FileUtils.h"
 
 #include <filesystem>
+#include <map>
 #include <set>
 
 using namespace CLEO;
@@ -16,8 +17,41 @@ namespace FS = std::filesystem;
 class FileSystemOperations 
 {
 public:
+    class FilesSearch
+    {
+        FS::path base;
+        StringList files = { 0 };
+        size_t iterationIndex = 0;
+
+    public:
+        FilesSearch() = default;
+        FilesSearch(const FilesSearch&) = delete; // no copying
+        FilesSearch& operator= (const FilesSearch&) = delete; // no copying
+
+        FilesSearch(const char* pattern, StringList& files)
+        {
+            base = FS::path(pattern).parent_path();
+            this->files = files;
+            iterationIndex = 0;
+        }
+
+        ~FilesSearch()
+        {
+            CLEO_StringListFree(files);
+        }
+
+        std::string Next()
+        {
+            if (iterationIndex >= files.count) return {}; // no more files
+
+            return FS::relative(files.strings[iterationIndex++], base).string();
+        }
+    };
+
     static std::set<DWORD> m_hFiles;
-    static std::set<HANDLE> m_hFileSearches;
+
+    static DWORD m_filesSearchLastId; // for generating handle values
+    static std::map<DWORD, FilesSearch> m_filesSearches;
 
     static void WINAPI OnFinalizeScriptObjects()
     {
@@ -26,8 +60,7 @@ public:
         m_hFiles.clear();
 
         // clean up file searches
-        for (auto handle : m_hFileSearches) FindClose(handle);
-        m_hFileSearches.clear();
+        m_filesSearches.clear();
     }
 
     FileSystemOperations() 
@@ -413,21 +446,24 @@ public:
     {
         OPCODE_READ_PARAM_FILEPATH(filename);
 
-        WIN32_FIND_DATA ffd = { 0 };
-        HANDLE handle = FindFirstFile(filename, &ffd);
+        auto list = CLEO_ListDirectory(thread, filename, true, true);
 
-        if (handle == INVALID_HANDLE_VALUE) // -1
+        if (list.count == 0)
         {
-            OPCODE_WRITE_PARAM_INT(-1); // invalid handle
+            CLEO_StringListFree(list);
+            OPCODE_WRITE_PARAM_INT(INVALID_HANDLE_VALUE);
             OPCODE_SKIP_PARAMS(1); // filename
             OPCODE_CONDITION_RESULT(false);
             return OR_CONTINUE;
         }
 
-        m_hFileSearches.insert(handle);
+        auto handle = m_filesSearchLastId++;
+        m_filesSearches.try_emplace(handle, filename, list);
+        
+        auto found = m_filesSearches[handle].Next(); // get first result
 
         OPCODE_WRITE_PARAM_INT(handle);
-        OPCODE_WRITE_PARAM_STRING(ffd.cFileName);
+        OPCODE_WRITE_PARAM_STRING(found.c_str());
         OPCODE_CONDITION_RESULT(true);
         return OR_CONTINUE;
     }
@@ -435,9 +471,9 @@ public:
     // 0AE7=2,%2s% = find_next_file %1d% //IF and SET
     static OpcodeResult WINAPI Script_FS_FindNextFile(CRunningScript* thread)
     {
-        auto handle = (HANDLE)OPCODE_READ_PARAM_INT();
+        auto handle = (DWORD)OPCODE_READ_PARAM_INT();
 
-        if (m_hFileSearches.find(handle) == m_hFileSearches.end())
+        if (m_filesSearches.find(handle) == m_filesSearches.end())
         {
             LOG_WARNING(thread, "Invalid or already closed file search handle (0x%X) in script %s", handle, ScriptInfoStr(thread).c_str());
             OPCODE_SKIP_PARAMS(1);
@@ -445,15 +481,15 @@ public:
             return OR_CONTINUE;
         }
 
-        WIN32_FIND_DATA ffd = { 0 };
-        if (!FindNextFile(handle, &ffd))
+        auto found = m_filesSearches[handle].Next();
+        if (found.empty())
         {
             OPCODE_SKIP_PARAMS(1);
             OPCODE_CONDITION_RESULT(false);
             return OR_CONTINUE;
         }
 
-        OPCODE_WRITE_PARAM_STRING(ffd.cFileName);
+        OPCODE_WRITE_PARAM_STRING(found.c_str());
         OPCODE_CONDITION_RESULT(true);
         return OR_CONTINUE;
     }
@@ -461,16 +497,15 @@ public:
     // 0AE8=1,find_close %1d%
     static OpcodeResult WINAPI Script_FS_FindClose(CRunningScript* thread)
     {
-        auto handle = (HANDLE)OPCODE_READ_PARAM_INT();
+        auto handle = (DWORD)OPCODE_READ_PARAM_INT();
 
-        if (m_hFileSearches.find(handle) == m_hFileSearches.end())
+        if (m_filesSearches.find(handle) == m_filesSearches.end())
         {
             LOG_WARNING(thread, "Invalid or already closed file search handle (0x%X) in script %s", handle, ScriptInfoStr(thread).c_str());
             return OR_CONTINUE;
         }
 
-        FindClose(handle);
-        m_hFileSearches.erase(handle);
+        m_filesSearches.erase(handle);
         return OR_CONTINUE;
     }
 
@@ -786,4 +821,5 @@ public:
 } fileSystemOperations;
 
 std::set<DWORD> FileSystemOperations::m_hFiles;
-std::set<HANDLE> FileSystemOperations::m_hFileSearches;
+DWORD FileSystemOperations::m_filesSearchLastId = 0x00010000; // handles start index
+std::map<DWORD, FileSystemOperations::FilesSearch> FileSystemOperations::m_filesSearches;
