@@ -387,10 +387,13 @@ public:
         CLEO_ResolvePath(thread, buff.data(), buff.size());
         buff.resize(strlen(buff.data()));
 
-        // ModLoader's hooks require relative paths in LoadLibrary to work
-        FilepathRemoveParent(buff, CLEO_GetGameDirectory());
+        if (std::filesystem::is_regular_file(buff))
+        {
+            // ModLoader's hooks require relative paths in LoadLibrary to work
+            FilepathRemoveParent(buff, CLEO_GetGameDirectory());
 
-        ptr = LoadLibrary(buff.c_str());
+            ptr = LoadLibrary(buff.c_str());
+        }
 
         // in case of just filename let LoadLibrary resolve it itself
         if (ptr == nullptr && !std::filesystem::path(path).has_parent_path())
