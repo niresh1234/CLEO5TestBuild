@@ -190,7 +190,6 @@ namespace CLEO
 
         saveSlot = MenuManager->m_bWantToLoad ? MenuManager->m_nSelectedSaveGame : -1;
 
-        TRACE(""); // separator
         TRACE("Starting new game, save slot: %d", saveSlot);
 
         // execute registered callbacks
@@ -202,7 +201,6 @@ namespace CLEO
         if (!m_bGameInProgress) return;
         m_bGameInProgress = false;
 
-        TRACE(""); // separator
         TRACE("Ending current game");
         GetInstance().CallCallbacks(eCallbackId::GameEnd); // execute registered callbacks
         ScriptEngine.GameEnd();
