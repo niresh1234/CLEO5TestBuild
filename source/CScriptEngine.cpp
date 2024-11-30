@@ -941,7 +941,22 @@ namespace CLEO
 
         GetInstance().ModuleSystem.LoadCleoModules();
         LoadState(GetInstance().saveSlot);
+
+        // keep already loaded scripts at front of processing queue
+        auto head = *activeThreadQueue;
+
+        auto tail = head;
+        while (tail->Next) tail = tail->Next;
+
+        // load custom scripts as new list
+        *activeThreadQueue = nullptr;
         LoadCustomScripts();
+
+        // append custom scripts list to the back
+        tail->Next = *activeThreadQueue;
+        (*activeThreadQueue)->Previous = tail;
+
+        *activeThreadQueue = head; // restore original
     }
 
     void CScriptEngine::GameEnd()
