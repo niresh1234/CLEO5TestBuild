@@ -265,7 +265,7 @@ namespace CLEO
             if (thread->IsCustom())
                 return reinterpret_cast<const CCustomScript*>(thread)->GetCompatibility();
             else
-                return CLEO::eCLEO_Version::CLEO_VER_CUR;
+                return CleoInstance.ScriptEngine.NativeScriptsVersion;
         }
 
         LPCSTR WINAPI CLEO_GetScriptFilename(const CRunningScript* thread)
@@ -937,6 +937,20 @@ namespace CLEO
         }
 
         NativeScriptsDebugMode = GetPrivateProfileInt("General", "DebugMode", 0, Filepath_Config.c_str()) != 0;
+
+        // global native scripts legacy mode
+        int ver = GetPrivateProfileInt("General", "MainScmLegacyMode", 0, Filepath_Config.c_str());
+        switch(ver)
+        {
+            case 3: NativeScriptsVersion = eCLEO_Version::CLEO_VER_3; break;
+            case 4: NativeScriptsVersion = eCLEO_Version::CLEO_VER_4; break;
+            default: 
+                NativeScriptsVersion = eCLEO_Version::CLEO_VER_CUR;
+                ver = 0;
+            break;
+        }
+        if (ver != 0) TRACE("Legacy mode for native scripts active: CLEO%d", ver);
+
         MainScriptCurWorkDir = Filepath_Game;
 
         CleoInstance.ModuleSystem.LoadCleoModules();
@@ -1537,13 +1551,13 @@ namespace CLEO
                 if (path.extension() == cs4_ext)
                     CompatVer = CLEO_VER_4;
                 else
-                    if (path.extension() == cs3_ext)
-                        CompatVer = CLEO_VER_3;
+                if (path.extension() == cs3_ext)
+                    CompatVer = CLEO_VER_3;
 
-                if (CompatVer == CLEO_VER_CUR && parent != nullptr && parent - IsCustom())
+                if (CompatVer == CLEO_VER_CUR && parent != nullptr)
                 {
                     // inherit compatibility mode from parent
-                    CompatVer = ((CCustomScript*)parent)->GetCompatibility();
+                    CompatVer = CLEO_GetScriptVersion(parent);
 
                     // try loading file with same compatibility mode filetype extension
                     auto compatPath = path;
@@ -1554,12 +1568,12 @@ namespace CLEO
                             path = compatPath;
                     }
                     else
-                        if (CompatVer == CLEO_VER_3)
-                        {
-                            compatPath.replace_extension(cs3_ext);
-                            if (FS::is_regular_file(compatPath))
-                                path = compatPath;
-                        }
+                    if (CompatVer == CLEO_VER_3)
+                    {
+                        compatPath.replace_extension(cs3_ext);
+                        if (FS::is_regular_file(compatPath))
+                            path = compatPath;
+                    }
                 }
 
                 scriptFileDir = path.parent_path().string();
