@@ -15,7 +15,9 @@ namespace CLEO
         friend struct ScmFunction;
         friend struct ThreadSavingInfo;
 
-        DWORD dwChecksum;
+        DWORD codeSize;
+        DWORD codeChecksum;
+
         bool bSaveEnabled;
         bool bOK;
         DWORD LastSearchPed, LastSearchCar, LastSearchObj;
@@ -49,6 +51,8 @@ namespace CLEO
 
         inline SCRIPT_VAR * GetVarsPtr() { return LocalVar; }
         inline bool IsOK() const { return bOK; }
+        inline DWORD GetCodeSize() const { return codeSize; }
+        inline DWORD GetCodeChecksum() const { return codeChecksum; }
         inline void enable_saving(bool en = true) { bSaveEnabled = en; }
         inline void SetCompatibility(eCLEO_Version ver) { CompatVer = ver; }
         inline eCLEO_Version GetCompatibility() const { return CompatVer; }
